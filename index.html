@@ -606,6 +606,7 @@
         text.setAttribute('class', 'sector-label');
         text.setAttribute('x', tp.x);
         text.setAttribute('y', tp.y);
+        text.setAttribute('fill', textColorFor(run.color));
         text.textContent = run.label;
         svg.appendChild(text);
       });
@@ -624,10 +625,29 @@
 
     /* ---------- 활동 입력 하단 시트 ---------- */
     const PALETTE = [
+      // 파스텔 톤
       '#FFD6D6', '#FFE5C2', '#FFF3C2', '#E2F5C2',
       '#C2F0DA', '#C2E8F5', '#C2D4FF', '#D9C2FF',
-      '#F2C2EE', '#F5C2D4'
+      '#F2C2EE', '#F5C2D4',
+      // 선명한 톤
+      '#FF6B6B', '#FF9F43', '#FFD93D', '#6BCB77',
+      '#4ECDC4', '#45AAF2', '#4B7BEC', '#A55EEA',
+      '#EC5EBA', '#FC5C7D',
+      // 진한 톤
+      '#C0392B', '#E67E22', '#16A085', '#27AE60',
+      '#2980B9', '#8E44AD', '#2C3E50', '#7F8C8D'
     ];
+
+    // 배경색 밝기에 따라 글자색(검정/흰색)을 자동 선택
+    function textColorFor(bg) {
+      const m = /^#([0-9a-f]{6})$/i.exec(bg);
+      if (!m) return '#1c1c1e';
+      const n = parseInt(m[1], 16);
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      // 상대 휘도 (sRGB 근사)
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      return lum > 150 ? '#1c1c1e' : '#ffffff';
+    }
 
     const backdrop = document.getElementById('backdrop');
     const sheet = document.getElementById('sheet');
