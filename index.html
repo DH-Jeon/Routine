@@ -816,7 +816,8 @@
       todoInput.value = '';
       backdrop.classList.add('open');
       todoSheet.classList.add('open');
-      setTimeout(() => todoInput.focus(), 250);
+      // 사용자 탭과 같은 동기 컨텍스트에서 바로 포커스해야 iOS가 키보드를 띄운다
+      todoInput.focus();
     }
     function closeTodoSheet() {
       backdrop.classList.remove('open');
