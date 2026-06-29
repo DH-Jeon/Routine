@@ -888,34 +888,48 @@
 
     // 터치/마우스 스와이프 삭제 (Pointer 이벤트로 통합)
     function enableSwipe(item, content, id) {
-      let startX = 0, dx = 0, width = 0, dragging = false, moved = false;
+      let startX = 0, startY = 0, dx = 0, width = 0, dragging = false, moved = false, axis = null;
 
       content.addEventListener('pointerdown', e => {
         dragging = true;
         moved = false;
+        axis = null; // 아직 가로/세로 방향 미확정
         startX = e.clientX;
+        startY = e.clientY;
         width = item.offsetWidth;
         content.style.transition = 'none';
-        content.setPointerCapture(e.pointerId);
       });
 
       content.addEventListener('pointermove', e => {
         if (!dragging) return;
-        dx = Math.min(0, e.clientX - startX); // 왼쪽으로만
-        if (Math.abs(dx) > 4) moved = true;
+        const mx = e.clientX - startX;
+        const my = e.clientY - startY;
+        // 첫 의미 있는 움직임으로 방향을 한 번만 결정 (축 잠금)
+        if (axis === null) {
+          if (Math.abs(mx) < 6 && Math.abs(my) < 6) return; // 너무 작은 떨림은 무시
+          axis = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
+          // 가로 스와이프로 확정된 경우에만 포인터를 캡처
+          if (axis === 'x') content.setPointerCapture(e.pointerId);
+        }
+        if (axis !== 'x') return; // 세로 스크롤이면 카드를 움직이지 않음 (빨간 배경 노출 방지)
+        moved = true;
+        dx = Math.min(0, mx); // 왼쪽으로만
         content.style.transform = 'translateX(' + dx + 'px)';
       });
 
       function endDrag() {
         if (!dragging) return;
         dragging = false;
-        content.style.transition = 'transform 0.25s ease';
-        if (Math.abs(dx) > width * 0.4) {
-          removeItem(item, content, id);
-        } else {
-          content.style.transform = 'translateX(0)';
+        if (axis === 'x') {
+          content.style.transition = 'transform 0.25s ease';
+          if (Math.abs(dx) > width * 0.4) {
+            removeItem(item, content, id);
+          } else {
+            content.style.transform = 'translateX(0)';
+          }
         }
         dx = 0;
+        axis = null;
       }
 
       content.addEventListener('pointerup', endDrag);
