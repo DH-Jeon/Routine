@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- 시스템 다크모드 연동: 폼 컨트롤 등 기본 UI 색도 함께 전환 -->
+  <meta name="color-scheme" content="light dark" />
+  <title>루틴 시간표</title>
+  <style>
+    /* ============================================================
+       디자인 토큰 (색/그림자 등). 색을 바꾸고 싶으면 여기만 수정하면
+       앱 전체에 반영된다. 다크모드 값은 아래 prefers-color-scheme 참고.
+       ============================================================ */
+    :root {
+      color-scheme: light dark;
+
+      --bg: #f2f2f7;            /* 전체 배경 */
+      --surface: #ffffff;       /* 카드·시트·시간표 패널 */
+      --surface-2: #f7f7fa;     /* 입력창 배경 */
+      --text: #1c1c1e;          /* 기본 글자색 */
+      --text-muted: #8e8e93;    /* 보조 글자색(시간 숫자·안내문) */
+      --on-pastel: #1c1c1e;     /* 파스텔 칸 위 활동 이름 (밝은 배경이라 항상 진하게) */
+      --border: #d1d1d6;        /* 입력창 테두리 */
+      --separator: #e0e0e5;     /* 영역 경계선·원 외곽선 */
+      --sector-empty: #ededf2;  /* 빈 시간 칸 색 */
+      --accent: #007aff;        /* 강조색(버튼·포커스) */
+      --danger: #ff3b30;        /* 삭제 배경 */
+      --done: #34c759;          /* 완료 체크 */
+      --done-text: #b0b0b5;     /* 완료된 할 일 글자 */
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);   /* 카드 그림자 */
+      --shadow-btn: 0 2px 8px rgba(0, 122, 255, 0.25);
+    }
+
+    /* 시스템이 다크모드일 때 토큰만 덮어쓴다 */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000;
+        --surface: #1c1c1e;
+        --surface-2: #2c2c2e;
+        --text: #f2f2f7;
+        --text-muted: #8e8e93;
+        --on-pastel: #1c1c1e;
+        --border: #3a3a3c;
+        --separator: #3a3a3c;
+        --sector-empty: #2c2c2e;
+        --accent: #0a84ff;
+        --danger: #ff453a;
+        --done: #30d158;
+        --done-text: #6e6e73;
+        --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        --shadow-btn: 0 2px 8px rgba(10, 132, 255, 0.35);
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent; /* 터치 시 깜빡이는 하이라이트 제거 */
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    /* 위/아래 절반씩 나누는 패널 공통 */
+    .panel {
+      height: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    /* 위쪽: 시간표 영역 (고정) */
+    .schedule {
+      flex: none;
+      background: var(--surface);
+      border-bottom: 1px solid var(--separator);
+    }
+
+    /* 정사각형 비율로 영역 가운데 꽉 차게 */
+    .clock-wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .clock {
+      width: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 1 / 1; /* 확대/회전에도 항상 정사각형 유지 */
+      display: block;
+    }
+
+    .sector {
+      stroke: none;
+      cursor: pointer;
+      transition: filter 0.12s ease;
+    }
+    .sector.empty {
+      fill: var(--sector-empty); /* 빈 칸은 데이터 색 대신 토큰으로 (다크모드 대응) */
+    }
+    .sector:active {
+      filter: brightness(0.92);
+    }
+
+    /* 칸 사이 구분선 (다른 활동일 때만 그림). 패널색과 같아 자연스럽게 나뉜다 */
+    .divider {
+      stroke: var(--surface);
+      stroke-width: 0.7;
+      stroke-linecap: round;
+    }
+    .clock-outline {
+      fill: none;
+      stroke: var(--separator);
+      stroke-width: 0.7;
+    }
+
+    .hour-num {
+      fill: var(--text-muted);
+      font-size: 4.2px;
+      font-weight: 600;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+
+    .sector-label {
+      fill: var(--on-pastel);
+      font-size: 3.4px;
+      font-weight: 500;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+
+    /* ---------- 활동 입력 하단 시트 ---------- */
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+      z-index: 10;
+    }
+    .backdrop.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--surface);
+      border-radius: 18px 18px 0 0;
+      /* 좌우/하단 safe-area(노치·홈바) 만큼 여백 확보 */
+      padding: 22px max(20px, env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18);
+      transform: translateY(110%);
+      transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+      z-index: 11;
+      max-width: 520px;
+      margin: 0 auto;
+      /* 짧은 화면(가로 모드·키보드 노출)에서도 버튼이 가려지지 않게 내부 스크롤 */
+      max-height: 90dvh;
+      overflow-y: auto;
+    }
+    .sheet.open {
+      transform: translateY(0);
+    }
+
+    .sheet-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .sheet-input {
+      width: 100%;
+      font-size: 16px; /* 16px 미만이면 iOS에서 포커스 시 화면이 확대됨 → 16px 유지 */
+      padding: 13px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-2);
+      color: var(--text);
+      outline: none;
+      margin-bottom: 18px;
+    }
+    .sheet-input:focus {
+      border-color: var(--accent);
+    }
+
+    .palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    /* 색 스와치 — 손가락으로 누르기 쉽게 44px 터치 영역 확보 */
+    .swatch {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+    .swatch.selected {
+      border-color: var(--text);
+      transform: scale(1.08);
+    }
+
+    .sheet-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      flex: 1;
+      min-height: 50px; /* 누르기 편한 높이 */
+      font-size: 16px;
+      font-weight: 600;
+      padding: 13px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .btn-cancel {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+    .btn-save {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ---------- 아래쪽: 할 일 영역 (영역 안에서만 스크롤) ---------- */
+    .tasks {
+      flex: none;
+      overflow-y: auto;
+      overscroll-behavior: contain; /* 끝까지 스크롤해도 바깥(페이지)으로 튀지 않게 */
+      -webkit-overflow-scrolling: touch;
+      background: var(--bg);
+      display: block;
+      padding: 0;
+    }
+
+    /* 스크롤해도 항상 위에 보이는 헤더 */
+    .tasks-header {
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      padding: 12px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+      z-index: 2;
+    }
+
+    .add-btn {
+      width: 100%;
+      min-height: 52px;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: var(--shadow-btn);
+    }
+    .add-btn:active {
+      filter: brightness(0.95);
+    }
+
+    .add-input-wrap {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .add-input-wrap[hidden] {
+      display: none;
+    }
+    .add-input {
+      flex: 1;
+      font-size: 16px;
+      padding: 13px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+    }
+    .add-input:focus {
+      border-color: var(--accent);
+    }
+
+    .todo-list {
+      padding: 4px max(12px, env(safe-area-inset-right)) 20px max(12px, env(safe-area-inset-left));
+    }
+
+    .todo-item {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    /* 뒤에 깔리는 빨간 삭제 배경 */
+    .todo-delete-bg {
+      position: absolute;
+      inset: 0;
+      background: var(--danger);
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 22px;
+    }
+
+    /* 스와이프로 움직이는 전경 */
+    .todo-content {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 56px; /* 누르기 편한 행 높이 */
+      background: var(--surface);
+      padding: 14px;
+      touch-action: pan-y; /* 세로 스크롤은 허용, 가로 스와이프는 JS가 처리 */
+      will-change: transform;
+      transform: translateX(0);
+    }
+
+    /* 완료 체크 — 28px 원, 충분한 터치 영역 */
+    .todo-check {
+      flex: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .todo-check svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .todo-text {
+      font-size: 16px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    /* 완료 상태: 초록 체크 + 취소선 + 흐리게 */
+    .todo-item.done .todo-check {
+      background: var(--done);
+      border-color: var(--done);
+    }
+    .todo-item.done .todo-check svg {
+      opacity: 1;
+    }
+    .todo-item.done .todo-text {
+      text-decoration: line-through;
+      color: var(--done-text);
+    }
+
+    /* 스와이프 삭제 시 높이 줄이며 사라지는 전환 */
+    .todo-item.removing {
+      transition: height 0.25s ease, margin 0.25s ease, opacity 0.25s ease;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 15px;
+      padding: 32px 16px;
+    }
+
+    /* ============================================================
+       가로 화면(landscape): 위/아래 대신 좌/우로 배치해 시간표가
+       찌그러지지 않게 한다. 세로 화면은 위 기본 레이아웃 그대로.
+       ============================================================ */
+    @media (orientation: landscape) {
+      body {
+        flex-direction: row;
+      }
+      .panel {
+        height: 100%;
+        width: 50%;
+      }
+      .schedule {
+        border-bottom: none;
+        border-right: 1px solid var(--separator);
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="panel schedule">
+    <div class="clock-wrap">
+      <svg class="clock" viewBox="0 0 100 100" id="clock"></svg>
+    </div>
+  </section>
+
+  <section class="panel tasks">
+    <div class="tasks-header">
+      <button class="add-btn" id="addBtn">+ 할 일 추가</button>
+      <div class="add-input-wrap" id="addInputWrap" hidden>
+        <input class="add-input" id="todoInput" type="text" placeholder="할 일을 입력하세요" maxlength="60" />
+      </div>
+    </div>
+    <div class="todo-list" id="todoList"></div>
+  </section>
+
+  <!-- 활동 입력 하단 시트 -->
+  <div class="backdrop" id="backdrop"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-title" id="sheetTitle">00시 활동</div>
+    <input class="sheet-input" id="sheetInput" type="text" placeholder="활동 이름 (비우면 삭제)" maxlength="12" />
+    <div class="palette" id="palette"></div>
+    <div class="sheet-actions">
+      <button class="btn btn-cancel" id="btnCancel">취소</button>
+      <button class="btn btn-save" id="btnSave">저장</button>
+    </div>
+  </div>
+
+  <script>
+    // 0시부터 23시까지의 데이터 배열. 이 배열을 기준으로 차트가 그려진다.
+    const schedule = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      label: '',
+      color: '#eeeeee'
+    }));
+
+    // ----- localStorage 저장/복원 -----
+    const STORAGE_SCHEDULE = 'routine.schedule';
+    const STORAGE_TODOS = 'routine.todos';
+
+    function saveSchedule() {
+      try { localStorage.setItem(STORAGE_SCHEDULE, JSON.stringify(schedule)); } catch (e) {}
+    }
+    function loadSchedule() {
+      try {
+        const raw = localStorage.getItem(STORAGE_SCHEDULE);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!Array.isArray(data)) return;
+        data.forEach(it => {
+          if (it && it.hour >= 0 && it.hour < 24) {
+            schedule[it.hour] = { hour: it.hour, label: it.label || '', color: it.color || '#eeeeee' };
+          }
+        });
+      } catch (e) {}
+    }
+    loadSchedule();
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const CX = 50;
+    const CY = 50;
+    const R_OUTER = 42;   // 칸 바깥 반지름
+    const R_LABEL = 46.5; // 시간 숫자 위치
+    const R_TEXT = 30;    // 칸 안 활동 이름 위치
+    const STEP = 15;      // 한 칸 = 15도
+
+    // 각도(정북 기준 시계방향, 도) → 좌표. 0도 = 12시 방향(위)
+    function polar(angleDeg, radius) {
+      const rad = (angleDeg - 90) * Math.PI / 180;
+      return {
+        x: CX + radius * Math.cos(rad),
+        y: CY + radius * Math.sin(rad)
+      };
+    }
+
+    // hour 칸의 부채꼴 path (중심 → 시작 외곽 → 호 → 중심)
+    function sectorPath(hour) {
+      const start = hour * STEP;
+      const end = start + STEP;
+      const p1 = polar(start, R_OUTER);
+      const p2 = polar(end, R_OUTER);
+      return `M ${CX} ${CY} L ${p1.x} ${p1.y} A ${R_OUTER} ${R_OUTER} 0 0 1 ${p2.x} ${p2.y} Z`;
+    }
+
+    // 연속으로 같은 활동(label+color)인 칸들을 한 묶음(run)으로 그룹화. 0시↔23시 경계도 연결.
+    function getRuns() {
+      const runs = [];
+      schedule.forEach(item => {
+        const last = runs[runs.length - 1];
+        const sameAsLast = last && item.label && last.label === item.label &&
+          last.color === item.color && last.hours[last.hours.length - 1] === item.hour - 1;
+        if (sameAsLast) {
+          last.hours.push(item.hour);
+        } else {
+          runs.push({ label: item.label, color: item.color, hours: [item.hour] });
+        }
+      });
+      // 자정 경계 묶기 (23시와 0시가 같은 활동이면 연결)
+      if (runs.length > 1) {
+        const first = runs[0];
+        const last = runs[runs.length - 1];
+        if (first.label && first.label === last.label && first.color === last.color &&
+          first.hours[0] === 0 && last.hours[last.hours.length - 1] === 23) {
+          last.hours = last.hours.concat(first.hours);
+          runs.shift();
+        }
+      }
+      return runs;
+    }
+
+    // 두 칸이 같은 활동으로 이어지는지 (경계 구분선 생략 여부)
+    function continuous(hourA, hourB) {
+      const a = schedule[hourA], b = schedule[hourB];
+      return !!a.label && a.label === b.label && a.color === b.color;
+    }
+
+    function render() {
+      const svg = document.getElementById('clock');
+      svg.innerHTML = '';
+
+      // 1) 부채꼴 칸 (색칠 + 클릭 영역)
+      schedule.forEach(item => {
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('d', sectorPath(item.hour));
+        path.dataset.hour = item.hour;
+        if (item.label) {
+          // 활동이 있으면 데이터의 파스텔 색으로 칠한다
+          path.setAttribute('class', 'sector');
+          path.setAttribute('fill', item.color);
+        } else {
+          // 빈 칸은 fill 속성 없이 .empty 클래스로 → CSS 토큰(--sector-empty)이 적용됨
+          path.setAttribute('class', 'sector empty');
+        }
+        path.addEventListener('click', () => openSheet(item.hour));
+        svg.appendChild(path);
+      });
+
+      // 2) 칸 사이 구분선 (이어지는 활동이면 생략)
+      for (let h = 0; h < 24; h++) {
+        const next = (h + 1) % 24;
+        if (continuous(h, next)) continue;
+        const angle = next * STEP; // h와 next 사이 경계
+        const inner = polar(angle, 0);
+        const outer = polar(angle, R_OUTER);
+        const line = document.createElementNS(SVG_NS, 'line');
+        line.setAttribute('class', 'divider');
+        line.setAttribute('x1', inner.x);
+        line.setAttribute('y1', inner.y);
+        line.setAttribute('x2', outer.x);
+        line.setAttribute('y2', outer.y);
+        svg.appendChild(line);
+      }
+
+      // 3) 바깥 원 외곽선
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      circle.setAttribute('class', 'clock-outline');
+      circle.setAttribute('cx', CX);
+      circle.setAttribute('cy', CY);
+      circle.setAttribute('r', R_OUTER);
+      svg.appendChild(circle);
+
+      // 4) 활동 이름 — 묶음(run)마다 가운데 한 번만 표시
+      getRuns().forEach(run => {
+        if (!run.label) return;
+        const midAngle = run.hours[0] * STEP + (run.hours.length * STEP) / 2;
+        const tp = polar(midAngle, R_TEXT);
+        const text = document.createElementNS(SVG_NS, 'text');
+        text.setAttribute('class', 'sector-label');
+        text.setAttribute('x', tp.x);
+        text.setAttribute('y', tp.y);
+        text.textContent = run.label;
+        svg.appendChild(text);
+      });
+
+      // 5) 바깥쪽 시간 숫자 (0~23)
+      for (let h = 0; h < 24; h++) {
+        const np = polar(h * STEP + STEP / 2, R_LABEL);
+        const num = document.createElementNS(SVG_NS, 'text');
+        num.setAttribute('class', 'hour-num');
+        num.setAttribute('x', np.x);
+        num.setAttribute('y', np.y);
+        num.textContent = h;
+        svg.appendChild(num);
+      }
+    }
+
+    /* ---------- 활동 입력 하단 시트 ---------- */
+    const PALETTE = [
+      '#FFD6D6', '#FFE5C2', '#FFF3C2', '#E2F5C2',
+      '#C2F0DA', '#C2E8F5', '#C2D4FF', '#D9C2FF',
+      '#F2C2EE', '#F5C2D4'
+    ];
+
+    const backdrop = document.getElementById('backdrop');
+    const sheet = document.getElementById('sheet');
+    const sheetTitle = document.getElementById('sheetTitle');
+    const sheetInput = document.getElementById('sheetInput');
+    const paletteEl = document.getElementById('palette');
+
+    let editingHour = null;
+    let selectedColor = PALETTE[0];
+
+    // 팔레트 스와치 생성
+    PALETTE.forEach(color => {
+      const sw = document.createElement('div');
+      sw.className = 'swatch';
+      sw.style.background = color;
+      sw.dataset.color = color;
+      sw.addEventListener('click', () => selectColor(color));
+      paletteEl.appendChild(sw);
+    });
+
+    function selectColor(color) {
+      selectedColor = color;
+      paletteEl.querySelectorAll('.swatch').forEach(sw => {
+        sw.classList.toggle('selected', sw.dataset.color === color);
+      });
+    }
+
+    function openSheet(hour) {
+      editingHour = hour;
+      const item = schedule[hour];
+      sheetTitle.textContent = String(hour).padStart(2, '0') + '시 활동';
+      sheetInput.value = item.label;
+      // 기존 색이 팔레트에 있으면 그 색, 없으면 첫 색 선택
+      selectColor(PALETTE.includes(item.color) ? item.color : PALETTE[0]);
+      backdrop.classList.add('open');
+      sheet.classList.add('open');
+      setTimeout(() => sheetInput.focus(), 250);
+    }
+
+    function closeSheet() {
+      backdrop.classList.remove('open');
+      sheet.classList.remove('open');
+      editingHour = null;
+    }
+
+    function saveSheet() {
+      if (editingHour === null) return;
+      const label = sheetInput.value.trim();
+      if (label === '') {
+        // 비우면 기본 회색으로
+        schedule[editingHour] = { hour: editingHour, label: '', color: '#eeeeee' };
+      } else {
+        schedule[editingHour] = { hour: editingHour, label, color: selectedColor };
+      }
+      saveSchedule();
+      render();
+      closeSheet();
+    }
+
+    document.getElementById('btnSave').addEventListener('click', saveSheet);
+    document.getElementById('btnCancel').addEventListener('click', closeSheet);
+    backdrop.addEventListener('click', closeSheet);
+    sheetInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') saveSheet();
+    });
+
+    render();
+
+    /* ---------- 할 일 목록 ---------- */
+    const todos = []; // [{id, text, done}]
+    let todoSeq = 1;
+
+    function saveTodos() {
+      try { localStorage.setItem(STORAGE_TODOS, JSON.stringify(todos)); } catch (e) {}
+    }
+    function loadTodos() {
+      try {
+        const raw = localStorage.getItem(STORAGE_TODOS);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!Array.isArray(data)) return;
+        data.forEach(t => {
+          if (t && typeof t.text === 'string') {
+            todos.push({ id: t.id, text: t.text, done: !!t.done });
+          }
+        });
+        // 다음 id가 기존과 겹치지 않게
+        todoSeq = todos.reduce((max, t) => Math.max(max, t.id || 0), 0) + 1;
+      } catch (e) {}
+    }
+    loadTodos();
+
+    const addBtn = document.getElementById('addBtn');
+    const addInputWrap = document.getElementById('addInputWrap');
+    const todoInput = document.getElementById('todoInput');
+    const todoList = document.getElementById('todoList');
+
+    function renderTodos() {
+      todoList.innerHTML = '';
+
+      if (todos.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = '할 일을 추가해보세요';
+        todoList.appendChild(empty);
+        return;
+      }
+
+      todos.forEach(todo => {
+        const item = document.createElement('div');
+        item.className = 'todo-item' + (todo.done ? ' done' : '');
+
+        const bg = document.createElement('div');
+        bg.className = 'todo-delete-bg';
+        bg.textContent = '삭제';
+
+        const content = document.createElement('div');
+        content.className = 'todo-content';
+
+        const check = document.createElement('div');
+        check.className = 'todo-check';
+        check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        check.addEventListener('click', () => toggleTodo(todo.id));
+
+        const text = document.createElement('span');
+        text.className = 'todo-text';
+        text.textContent = todo.text;
+
+        content.appendChild(check);
+        content.appendChild(text);
+        item.appendChild(bg);
+        item.appendChild(content);
+        todoList.appendChild(item);
+
+        enableSwipe(item, content, todo.id);
+      });
+    }
+
+    // 터치/마우스 스와이프 삭제 (Pointer 이벤트로 통합)
+    function enableSwipe(item, content, id) {
+      let startX = 0, dx = 0, width = 0, dragging = false, moved = false;
+
+      content.addEventListener('pointerdown', e => {
+        dragging = true;
+        moved = false;
+        startX = e.clientX;
+        width = item.offsetWidth;
+        content.style.transition = 'none';
+        content.setPointerCapture(e.pointerId);
+      });
+
+      content.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        dx = Math.min(0, e.clientX - startX); // 왼쪽으로만
+        if (Math.abs(dx) > 4) moved = true;
+        content.style.transform = 'translateX(' + dx + 'px)';
+      });
+
+      function endDrag() {
+        if (!dragging) return;
+        dragging = false;
+        content.style.transition = 'transform 0.25s ease';
+        if (Math.abs(dx) > width * 0.4) {
+          removeItem(item, content, id);
+        } else {
+          content.style.transform = 'translateX(0)';
+        }
+        dx = 0;
+      }
+
+      content.addEventListener('pointerup', endDrag);
+      content.addEventListener('pointercancel', endDrag);
+      // 드래그 직후 발생하는 클릭으로 체크 토글되는 것 방지
+      content.addEventListener('click', e => {
+        if (moved) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      }, true);
+    }
+
+    // 항목이 스르륵 사라지며 삭제
+    function removeItem(item, content, id) {
+      // 1) 데이터에서 먼저 제거 — 애니메이션 도중 다른 동작으로 목록이
+      //    다시 그려져도 삭제한 항목이 되살아나지 않게 한다.
+      const i = todos.findIndex(t => t.id === id);
+      if (i === -1) return;
+      todos.splice(i, 1);
+      saveTodos();
+
+      // 2) DOM 노드만 애니메이션 후 제거 (목록 전체를 다시 그리지 않음)
+      const h = item.offsetHeight;
+      content.style.transform = 'translateX(-100%)';
+      item.style.height = h + 'px';
+      item.offsetHeight; // 강제 리플로우
+      item.classList.add('removing');
+      item.style.height = '0px';
+      item.style.marginBottom = '0px';
+      item.style.opacity = '0';
+
+      let finished = false;
+      const done = () => {
+        if (finished) return;
+        finished = true;
+        item.remove();
+        if (todos.length === 0) renderTodos(); // 마지막 항목이면 안내문 표시
+      };
+      item.addEventListener('transitionend', e => {
+        if (e.propertyName === 'height') done();
+      }, { once: true });
+      setTimeout(done, 350); // transitionend가 누락돼도 반드시 제거
+    }
+
+    function addTodo(text) {
+      const trimmed = text.trim();
+      if (trimmed === '') return;
+      todos.push({ id: todoSeq++, text: trimmed, done: false });
+      saveTodos();
+      renderTodos();
+    }
+
+    function toggleTodo(id) {
+      const todo = todos.find(t => t.id === id);
+      if (todo) {
+        todo.done = !todo.done;
+        saveTodos();
+        renderTodos();
+      }
+    }
+
+    // "+ 할 일 추가" → 입력창 표시 + 포커스
+    addBtn.addEventListener('click', () => {
+      addInputWrap.hidden = false;
+      todoInput.focus();
+    });
+
+    todoInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        addTodo(todoInput.value);
+        todoInput.value = '';
+        todoInput.focus(); // 연속 입력 가능
+      }
+    });
+
+    // 입력창 밖을 누르면(비어있을 때) 닫기
+    todoInput.addEventListener('blur', () => {
+      if (todoInput.value.trim() === '') {
+        addInputWrap.hidden = true;
+      }
+    });
+
+    renderTodos();
+  </script>
+</body>
+</html>
