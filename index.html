@@ -179,6 +179,12 @@
       pointer-events: none;
     }
 
+    /* 현재 시각 마커 (링 바깥 작은 삼각형) */
+    .now-marker {
+      fill: var(--accent);
+      pointer-events: none;
+    }
+
     .sector-label {
       fill: var(--on-pastel);
       font-size: 3.4px;
@@ -513,7 +519,8 @@
     }
     const schedules = Array.from({ length: 7 }, emptyDay);
     // 오늘 요일을 기본 선택 (getDay: 0=일 → 월=0 기준으로 변환)
-    let currentDay = (new Date().getDay() + 6) % 7;
+    const TODAY = (new Date().getDay() + 6) % 7; // 고정된 오늘 요일 (현재 시각 마커용)
+    let currentDay = TODAY;
     // 현재 보고 있는 요일의 배열 (render/openSheet 등이 이 변수를 기준으로 동작)
     let schedule = schedules[currentDay];
 
@@ -684,6 +691,19 @@
         num.textContent = h;
         svg.appendChild(num);
       }
+
+      // 6) 현재 시각 마커 (오늘 요일 탭에서만)
+      if (currentDay === TODAY) {
+        const now = new Date();
+        const angle = (now.getHours() + now.getMinutes() / 60) * STEP; // 0~360
+        const tip = polar(angle, R_OUTER + 0.5);   // 안쪽(링)을 향하는 꼭짓점
+        const b1 = polar(angle - 2.2, R_OUTER + 3.2);
+        const b2 = polar(angle + 2.2, R_OUTER + 3.2);
+        const tri = document.createElementNS(SVG_NS, 'path');
+        tri.setAttribute('class', 'now-marker');
+        tri.setAttribute('d', `M ${tip.x} ${tip.y} L ${b1.x} ${b1.y} L ${b2.x} ${b2.y} Z`);
+        svg.appendChild(tri);
+      }
     }
 
     /* ---------- 활동 입력 하단 시트 ---------- */
@@ -799,6 +819,8 @@
 
     renderDayTabs();
     render();
+    // 1분마다 현재 시각 마커 위치 갱신 (오늘 탭을 볼 때만)
+    setInterval(() => { if (currentDay === TODAY) render(); }, 60000);
 
     /* ---------- 할 일 목록 ---------- */
     const todos = []; // [{id, text, done}]
