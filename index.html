@@ -94,14 +94,42 @@
     /* 위쪽: 시간표 영역 (고정) */
     .schedule {
       flex: none;
+      flex-direction: column; /* 요일 탭 + 시계를 세로로 */
       background: var(--surface);
       border-bottom: 1px solid var(--separator);
     }
 
-    /* 정사각형 비율로 영역 가운데 꽉 차게 */
-    .clock-wrap {
+    /* 요일 선택 탭 (월~일) */
+    .day-tabs {
+      flex: none;
+      display: flex;
+      gap: 4px;
       width: 100%;
-      height: 100%;
+      max-width: 360px;
+      margin-bottom: 12px;
+    }
+    .day-tab {
+      flex: 1;
+      padding: 7px 0;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+    .day-tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* 정사각형 비율로 남은 영역 가운데 꽉 차게 */
+    .clock-wrap {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -430,6 +458,7 @@
 </head>
 <body>
   <section class="panel schedule">
+    <div class="day-tabs" id="dayTabs"></div>
     <div class="clock-wrap">
       <svg class="clock" viewBox="0 0 100 100" id="clock"></svg>
     </div>
@@ -465,31 +494,49 @@
   </div>
 
   <script>
-    // 0시부터 23시까지의 데이터 배열. 이 배열을 기준으로 차트가 그려진다.
-    const schedule = Array.from({ length: 24 }, (_, hour) => ({
-      hour,
-      label: '',
-      color: '#eeeeee'
-    }));
+    // 요일별(월~일) 24시간 데이터. schedules[요일][시] 형태로 보관한다.
+    const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
+    function emptyDay() {
+      return Array.from({ length: 24 }, (_, hour) => ({ hour, label: '', color: '#eeeeee' }));
+    }
+    const schedules = Array.from({ length: 7 }, emptyDay);
+    // 오늘 요일을 기본 선택 (getDay: 0=일 → 월=0 기준으로 변환)
+    let currentDay = (new Date().getDay() + 6) % 7;
+    // 현재 보고 있는 요일의 배열 (render/openSheet 등이 이 변수를 기준으로 동작)
+    let schedule = schedules[currentDay];
 
     // ----- localStorage 저장/복원 -----
-    const STORAGE_SCHEDULE = 'routine.schedule';
+    const STORAGE_SCHEDULES = 'routine.schedules';
+    const STORAGE_SCHEDULE_OLD = 'routine.schedule'; // 예전 단일 시간표 (마이그레이션용)
     const STORAGE_TODOS = 'routine.todos';
 
     function saveSchedule() {
-      try { localStorage.setItem(STORAGE_SCHEDULE, JSON.stringify(schedule)); } catch (e) {}
+      try { localStorage.setItem(STORAGE_SCHEDULES, JSON.stringify(schedules)); } catch (e) {}
+    }
+    function applyDayData(target, data) {
+      if (!Array.isArray(data)) return;
+      data.forEach(it => {
+        if (it && it.hour >= 0 && it.hour < 24) {
+          target[it.hour] = { hour: it.hour, label: it.label || '', color: it.color || '#eeeeee' };
+        }
+      });
     }
     function loadSchedule() {
       try {
-        const raw = localStorage.getItem(STORAGE_SCHEDULE);
-        if (!raw) return;
-        const data = JSON.parse(raw);
-        if (!Array.isArray(data)) return;
-        data.forEach(it => {
-          if (it && it.hour >= 0 && it.hour < 24) {
-            schedule[it.hour] = { hour: it.hour, label: it.label || '', color: it.color || '#eeeeee' };
+        const raw = localStorage.getItem(STORAGE_SCHEDULES);
+        if (raw) {
+          const data = JSON.parse(raw);
+          if (Array.isArray(data)) {
+            data.forEach((day, di) => { if (di < 7) applyDayData(schedules[di], day); });
           }
-        });
+          return;
+        }
+        // 예전 단일 시간표가 있으면 모든 요일에 복사 (기존 사용자 데이터 보존)
+        const old = localStorage.getItem(STORAGE_SCHEDULE_OLD);
+        if (old) {
+          const data = JSON.parse(old);
+          for (let di = 0; di < 7; di++) applyDayData(schedules[di], data);
+        }
       } catch (e) {}
     }
     loadSchedule();
@@ -714,6 +761,26 @@
       if (e.key === 'Enter') saveSheet();
     });
 
+    /* ---------- 요일 탭 ---------- */
+    const dayTabs = document.getElementById('dayTabs');
+    function renderDayTabs() {
+      dayTabs.innerHTML = '';
+      DAYS.forEach((d, i) => {
+        const b = document.createElement('button');
+        b.className = 'day-tab' + (i === currentDay ? ' active' : '');
+        b.textContent = d;
+        b.addEventListener('click', () => selectDay(i));
+        dayTabs.appendChild(b);
+      });
+    }
+    function selectDay(i) {
+      currentDay = i;
+      schedule = schedules[currentDay]; // 현재 요일 배열로 교체
+      renderDayTabs();
+      render();
+    }
+
+    renderDayTabs();
     render();
 
     /* ---------- 할 일 목록 ---------- */
