@@ -407,9 +407,18 @@
     }
 
     .todo-text {
+      flex: 1;
       font-size: 16px;
       line-height: 1.35;
       word-break: break-word;
+    }
+
+    /* 추가된 날짜 (월/일) — 행 오른쪽에 작게 */
+    .todo-date {
+      flex: none;
+      font-size: 13px;
+      color: var(--text-muted);
+      white-space: nowrap;
     }
 
     /* 완료 상태: 초록 체크 + 취소선 + 흐리게 */
@@ -798,7 +807,7 @@
         if (!Array.isArray(data)) return;
         data.forEach(t => {
           if (t && typeof t.text === 'string') {
-            todos.push({ id: t.id, text: t.text, done: !!t.done });
+            todos.push({ id: t.id, text: t.text, done: !!t.done, createdAt: t.createdAt });
           }
         });
         // 다음 id가 기존과 겹치지 않게
@@ -822,6 +831,13 @@
     function closeTodoSheet() {
       backdrop.classList.remove('open');
       todoSheet.classList.remove('open');
+    }
+
+    // 추가된 날짜를 월/일 형식으로 (예전 항목은 날짜가 없어 빈칸)
+    function formatDate(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      return (d.getMonth() + 1) + '/' + d.getDate();
     }
 
     function renderTodos() {
@@ -855,8 +871,13 @@
         text.className = 'todo-text';
         text.textContent = todo.text;
 
+        const date = document.createElement('span');
+        date.className = 'todo-date';
+        date.textContent = formatDate(todo.createdAt);
+
         content.appendChild(check);
         content.appendChild(text);
+        content.appendChild(date);
         item.appendChild(bg);
         item.appendChild(content);
         todoList.appendChild(item);
@@ -943,7 +964,7 @@
     function addTodo(text) {
       const trimmed = text.trim();
       if (trimmed === '') return;
-      todos.push({ id: todoSeq++, text: trimmed, done: false });
+      todos.push({ id: todoSeq++, text: trimmed, done: false, createdAt: Date.now() });
       saveTodos();
       renderTodos();
     }
