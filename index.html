@@ -16,6 +16,16 @@
 
   <title>루틴 시간표</title>
   <style>
+    /* Pretendard 가변 폰트 (오프라인 자체 포함) */
+    @font-face {
+      font-family: 'Pretendard Variable';
+      font-weight: 45 920;
+      font-style: normal;
+      font-display: swap;
+      src: local('Pretendard Variable'),
+           url('fonts/PretendardVariable.woff2') format('woff2-variations');
+    }
+
     /* ============================================================
        디자인 토큰 (색/그림자 등). 색을 바꾸고 싶으면 여기만 수정하면
        앱 전체에 반영된다. 다크모드 값은 아래 prefers-color-scheme 참고.
@@ -76,7 +86,7 @@
       height: 100dvh;
       display: flex;
       flex-direction: column;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       color: var(--text);
       background: var(--bg);
       overflow: hidden;
