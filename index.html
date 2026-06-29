@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <!-- 시스템 다크모드 연동: 폼 컨트롤 등 기본 UI 색도 함께 전환 -->
   <meta name="color-scheme" content="light dark" />
+
+  <!-- 아이폰 홈화면 아이콘 (180x180 PNG) -->
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <!-- 홈화면에서 실행 시 주소창 없이 전체화면 앱처럼 -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="루틴" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
   <title>루틴 시간표</title>
   <style>
     /* ============================================================
@@ -594,9 +603,9 @@
         svg.appendChild(text);
       });
 
-      // 5) 바깥쪽 시간 숫자 (0~23)
+      // 5) 바깥쪽 시간 숫자 (0~23) — 칸 가운데가 아니라 칸 경계선 위에 표시
       for (let h = 0; h < 24; h++) {
-        const np = polar(h * STEP + STEP / 2, R_LABEL);
+        const np = polar(h * STEP, R_LABEL);
         const num = document.createElementNS(SVG_NS, 'text');
         num.setAttribute('class', 'hour-num');
         num.setAttribute('x', np.x);
