@@ -135,6 +135,49 @@
       color: #fff;
     }
 
+    /* 현재 요일을 다른 요일로 복사하는 버튼 */
+    .copy-day-btn {
+      flex: none;
+      align-self: center;
+      margin-bottom: 12px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .copy-day-btn:active {
+      filter: brightness(0.95);
+    }
+
+    /* 복사 대상 요일 선택 칩 */
+    .day-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+    .day-chip {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 14px;
+      font-size: 15px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .day-chip.selected {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
     /* 정사각형 비율로 남은 영역 가운데 꽉 차게 */
     .clock-wrap {
       flex: 1;
@@ -151,6 +194,7 @@
       max-height: 100%;
       aspect-ratio: 1 / 1; /* 확대/회전에도 항상 정사각형 유지 */
       display: block;
+      touch-action: none; /* 길게 눌러 드래그로 범위 선택할 때 페이지 스크롤이 제스처를 끊지 않게 */
     }
 
     .sector {
@@ -166,6 +210,12 @@
     }
     .sector:active {
       filter: brightness(0.92);
+    }
+    /* 길게 눌러 드래그하는 동안 선택된 칸 강조 */
+    .sector.sel {
+      stroke: var(--accent);
+      stroke-width: 1.4;
+      filter: brightness(1.06);
     }
 
     /* 칸 사이 구분선 (다른 활동일 때만 그림). 패널색과 같아 자연스럽게 나뉜다 */
@@ -487,6 +537,7 @@
 <body>
   <section class="panel schedule">
     <div class="day-tabs" id="dayTabs"></div>
+    <button class="copy-day-btn" id="copyDayBtn">이 요일 복사</button>
     <div class="clock-wrap">
       <svg class="clock" viewBox="0 0 100 100" id="clock"></svg>
     </div>
@@ -518,6 +569,16 @@
     <div class="sheet-actions">
       <button class="btn btn-cancel" id="btnTodoCancel">취소</button>
       <button class="btn btn-save" id="btnTodoAdd">추가</button>
+    </div>
+  </div>
+
+  <!-- 요일 복사 하단 시트 -->
+  <div class="sheet" id="copySheet">
+    <div class="sheet-title" id="copyTitle">어디에 복사할까요?</div>
+    <div class="day-chips" id="copyChips"></div>
+    <div class="sheet-actions">
+      <button class="btn btn-cancel" id="btnCopyCancel">취소</button>
+      <button class="btn btn-save" id="btnCopyApply">붙여넣기</button>
     </div>
   </div>
 
@@ -632,24 +693,35 @@
       return !!a.label && a.label === b.label && a.color === b.color;
     }
 
+    // 길게 눌러 드래그하는 동안의 선택 범위 (null이면 선택 중 아님)
+    let selRange = null; // { start, end }
+    function selectedHours() {
+      const set = new Set();
+      if (selRange) {
+        const lo = Math.min(selRange.start, selRange.end);
+        const hi = Math.max(selRange.start, selRange.end);
+        for (let h = lo; h <= hi; h++) set.add(h);
+      }
+      return set;
+    }
+
     function render() {
       const svg = document.getElementById('clock');
       svg.innerHTML = '';
 
-      // 1) 부채꼴 칸 (색칠 + 클릭 영역)
+      // 길게 눌러 드래그하는 동안 선택된 시간 범위 (없으면 빈 Set)
+      const selHours = selectedHours();
+
+      // 1) 부채꼴 칸 (색칠 + 클릭 영역). 클릭/드래그는 SVG에 위임(setupClockGestures)
       schedule.forEach(item => {
         const path = document.createElementNS(SVG_NS, 'path');
         path.setAttribute('d', sectorPath(item.hour));
         path.dataset.hour = item.hour;
-        if (item.label) {
-          // 활동이 있으면 데이터의 파스텔 색으로 칠한다
-          path.setAttribute('class', 'sector');
-          path.setAttribute('fill', item.color);
-        } else {
-          // 빈 칸은 fill 속성 없이 .empty 클래스로 → CSS 토큰(--sector-empty)이 적용됨
-          path.setAttribute('class', 'sector empty');
-        }
-        path.addEventListener('click', () => openSheet(item.hour));
+        let cls = item.label ? 'sector' : 'sector empty';
+        if (selHours.has(item.hour)) cls += ' sel';
+        // 활동이 있으면 데이터의 파스텔 색으로, 빈 칸은 .empty 클래스로(CSS 토큰)
+        if (item.label) path.setAttribute('fill', item.color);
+        path.setAttribute('class', cls);
         svg.appendChild(path);
       });
 
@@ -748,7 +820,7 @@
     const sheetInput = document.getElementById('sheetInput');
     const paletteEl = document.getElementById('palette');
 
-    let editingHour = null;
+    let editStart = null, editEnd = null; // 편집 중인 시간 범위 (단일이면 start === end)
     let selectedColor = PALETTE[0];
 
     // 팔레트 스와치 생성
@@ -768,10 +840,15 @@
       });
     }
 
-    function openSheet(hour) {
-      editingHour = hour;
-      const item = schedule[hour];
-      sheetTitle.textContent = String(hour).padStart(2, '0') + '시 활동';
+    function openSheet(start, end) {
+      if (end === undefined) end = start;
+      editStart = start;
+      editEnd = end;
+      const item = schedule[start];
+      const pad = h => String(h).padStart(2, '0');
+      sheetTitle.textContent = start === end
+        ? pad(start) + '시 활동'
+        : pad(start) + '시–' + pad(end) + '시 활동';
       sheetInput.value = item.label;
       // 기존 색이 팔레트에 있으면 그 색, 없으면 첫 색 선택
       selectColor(PALETTE.includes(item.color) ? item.color : PALETTE[0]);
@@ -784,17 +861,17 @@
     function closeSheet() {
       backdrop.classList.remove('open');
       sheet.classList.remove('open');
-      editingHour = null;
+      editStart = editEnd = null;
     }
 
     function saveSheet() {
-      if (editingHour === null) return;
+      if (editStart === null) return;
       const label = sheetInput.value.trim();
-      if (label === '') {
-        // 비우면 기본 회색으로
-        schedule[editingHour] = { hour: editingHour, label: '', color: '#eeeeee' };
-      } else {
-        schedule[editingHour] = { hour: editingHour, label, color: selectedColor };
+      // 범위 내 모든 시간에 같은 활동 적용 (비우면 회색 빈 칸으로 초기화)
+      for (let h = editStart; h <= editEnd; h++) {
+        schedule[h] = label === ''
+          ? { hour: h, label: '', color: '#eeeeee' }
+          : { hour: h, label, color: selectedColor };
       }
       saveSchedule();
       render();
@@ -803,10 +880,123 @@
 
     document.getElementById('btnSave').addEventListener('click', saveSheet);
     document.getElementById('btnCancel').addEventListener('click', closeSheet);
-    backdrop.addEventListener('click', () => { closeSheet(); closeTodoSheet(); });
+    backdrop.addEventListener('click', () => { closeSheet(); closeTodoSheet(); closeCopySheet(); });
     sheetInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') saveSheet();
     });
+
+    /* ---------- 시계: 짧은 탭(단일) + 길게 눌러 드래그(범위 선택) ---------- */
+    function setupClockGestures() {
+      const svg = document.getElementById('clock');
+      const LONG_MS = 700;     // 길게 누름 인식 시간(약 1초 내)
+      const MOVE_CANCEL = 8;   // 길게 누름 전 이 거리(px)를 넘게 움직이면 취소
+      let timer = null, startHour = null, downXY = null, active = false;
+
+      function hourFromEvent(e) {
+        const rect = svg.getBoundingClientRect();
+        const sx = (e.clientX - rect.left) / rect.width * 100;
+        const sy = (e.clientY - rect.top) / rect.height * 100;
+        let deg = Math.atan2(sy - CY, sx - CX) * 180 / Math.PI + 90;
+        deg = ((deg % 360) + 360) % 360;
+        return Math.floor(deg / STEP) % 24;
+      }
+      function clearTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+
+      svg.addEventListener('pointerdown', e => {
+        startHour = hourFromEvent(e);
+        downXY = { x: e.clientX, y: e.clientY };
+        active = false;
+        clearTimer();
+        timer = setTimeout(() => {
+          // 길게 누름 성립 → 범위 선택 시작
+          active = true;
+          timer = null;
+          selRange = { start: startHour, end: startHour };
+          try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+          if (navigator.vibrate) navigator.vibrate(15);
+          render();
+        }, LONG_MS);
+      });
+
+      svg.addEventListener('pointermove', e => {
+        if (active) {
+          selRange.end = hourFromEvent(e);
+          render();
+        } else if (downXY) {
+          // 길게 누름 전 큰 움직임이면 제스처 취소(스크롤 등으로 간주)
+          if (Math.abs(e.clientX - downXY.x) > MOVE_CANCEL ||
+              Math.abs(e.clientY - downXY.y) > MOVE_CANCEL) {
+            clearTimer();
+            downXY = null;
+          }
+        }
+      });
+
+      svg.addEventListener('pointerup', e => {
+        if (active) {
+          // 범위 선택 완료 → 범위 입력 시트 열기
+          const lo = Math.min(selRange.start, selRange.end);
+          const hi = Math.max(selRange.start, selRange.end);
+          selRange = null;
+          render();
+          openSheet(lo, hi);
+        } else if (timer && downXY) {
+          // 짧은 탭 → 단일 칸 입력
+          clearTimer();
+          openSheet(hourFromEvent(e));
+        }
+        active = false; startHour = null; downXY = null;
+      });
+
+      function cancelGesture() {
+        clearTimer();
+        if (active && selRange) { selRange = null; render(); }
+        active = false; startHour = null; downXY = null;
+      }
+      svg.addEventListener('pointercancel', cancelGesture);
+      svg.addEventListener('pointerleave', () => { if (!active) { clearTimer(); downXY = null; } });
+    }
+    setupClockGestures();
+
+    /* ---------- 요일 복사 ---------- */
+    const copySheet = document.getElementById('copySheet');
+    const copyTitle = document.getElementById('copyTitle');
+    const copyChips = document.getElementById('copyChips');
+
+    function openCopySheet() {
+      copyTitle.textContent = DAYS[currentDay] + '요일을 어디에 복사할까요?';
+      copyChips.innerHTML = '';
+      // 현재 요일을 제외한 나머지 요일을 다중 선택 칩으로 표시
+      DAYS.forEach((d, i) => {
+        if (i === currentDay) return;
+        const chip = document.createElement('button');
+        chip.className = 'day-chip';
+        chip.textContent = d;
+        chip.dataset.day = i;
+        chip.addEventListener('click', () => chip.classList.toggle('selected'));
+        copyChips.appendChild(chip);
+      });
+      backdrop.classList.add('open');
+      copySheet.classList.add('open');
+    }
+    function closeCopySheet() {
+      backdrop.classList.remove('open');
+      copySheet.classList.remove('open');
+    }
+    function applyCopy() {
+      const targets = copyChips.querySelectorAll('.day-chip.selected');
+      targets.forEach(chip => {
+        const i = Number(chip.dataset.day);
+        // 현재 요일 전체를 깊은 복사로 대상 요일에 덮어쓴다
+        schedules[i] = schedule.map(it => ({ hour: it.hour, label: it.label, color: it.color }));
+      });
+      saveSchedule();
+      render();
+      closeCopySheet();
+    }
+    document.getElementById('copyDayBtn').addEventListener('click', openCopySheet);
+    document.getElementById('btnCopyCancel').addEventListener('click', closeCopySheet);
+    document.getElementById('btnCopyApply').addEventListener('click', applyCopy);
 
     /* ---------- 요일 탭 ---------- */
     const dayTabs = document.getElementById('dayTabs');
