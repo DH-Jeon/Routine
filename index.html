@@ -150,6 +150,9 @@
     }
     .sector.empty {
       fill: var(--sector-empty); /* 빈 칸은 데이터 색 대신 토큰으로 (다크모드 대응) */
+      /* 인접한 빈 칸 사이의 안티앨리어싱 잔금을 같은 색 테두리로 메운다 */
+      stroke: var(--sector-empty);
+      stroke-width: 0.5;
     }
     .sector:active {
       filter: brightness(0.92);
@@ -545,6 +548,9 @@
         if (old) {
           const data = JSON.parse(old);
           for (let di = 0; di < 7; di++) applyDayData(schedules[di], data);
+          // 새 형식으로 옮긴 뒤 예전 키 제거
+          saveSchedule();
+          localStorage.removeItem(STORAGE_SCHEDULE_OLD);
         }
       } catch (e) {}
     }
@@ -602,9 +608,10 @@
       return runs;
     }
 
-    // 두 칸이 같은 활동으로 이어지는지 (경계 구분선 생략 여부)
+    // 두 칸이 이어지는지 (경계 구분선 생략 여부)
     function continuous(hourA, hourB) {
       const a = schedule[hourA], b = schedule[hourB];
+      if (!a.label && !b.label) return true; // 빈 칸끼리는 잔금 없이 합친다
       return !!a.label && a.label === b.label && a.color === b.color;
     }
 
@@ -740,7 +747,8 @@
       selectColor(PALETTE.includes(item.color) ? item.color : PALETTE[0]);
       backdrop.classList.add('open');
       sheet.classList.add('open');
-      setTimeout(() => sheetInput.focus(), 250);
+      // 사용자 탭과 같은 동기 컨텍스트에서 바로 포커스해야 iOS가 키보드를 띄운다
+      sheetInput.focus();
     }
 
     function closeSheet() {
@@ -812,6 +820,10 @@
         });
         // 다음 id가 기존과 겹치지 않게
         todoSeq = todos.reduce((max, t) => Math.max(max, t.id || 0), 0) + 1;
+        // id가 없는(구버전·손상) 항목에 새 id 부여 → 토글·삭제 가능하게
+        let fixed = false;
+        todos.forEach(t => { if (t.id == null) { t.id = todoSeq++; fixed = true; } });
+        if (fixed) saveTodos();
       } catch (e) {}
     }
     loadTodos();
