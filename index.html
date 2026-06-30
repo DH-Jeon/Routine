@@ -109,14 +109,22 @@
       border-bottom: 1px solid var(--separator);
     }
 
-    /* 요일 선택 탭 (월~일) */
-    .day-tabs {
-      flex: none;
+    /* 요일 탭 + 복사 버튼을 한 줄에 배치 (시계 높이를 빼앗지 않음) */
+    .schedule-top {
       display: flex;
-      gap: 4px;
+      align-items: stretch;
+      gap: 6px;
       width: 100%;
       max-width: 360px;
       margin-bottom: 12px;
+    }
+
+    /* 요일 선택 탭 (월~일) */
+    .day-tabs {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      gap: 4px;
     }
     .day-tab {
       flex: 1;
@@ -135,16 +143,15 @@
       color: #fff;
     }
 
-    /* 현재 요일을 다른 요일로 복사하는 버튼 */
+    /* 현재 요일을 다른 요일로 복사하는 버튼 (요일 탭 오른쪽) */
     .copy-day-btn {
       flex: none;
-      align-self: center;
-      margin-bottom: 12px;
-      padding: 6px 14px;
+      white-space: nowrap;
+      padding: 0 12px;
       font-size: 13px;
       font-weight: 600;
       border: 1px solid var(--border);
-      border-radius: 999px;
+      border-radius: 8px;
       background: var(--surface-2);
       color: var(--text-muted);
       cursor: pointer;
@@ -195,6 +202,11 @@
       aspect-ratio: 1 / 1; /* 확대/회전에도 항상 정사각형 유지 */
       display: block;
       touch-action: none; /* 길게 눌러 드래그로 범위 선택할 때 페이지 스크롤이 제스처를 끊지 않게 */
+      /* 삼성 등 안드로이드에서 길게 누를 때 텍스트 선택·컨텍스트 메뉴가 떠
+         제스처가 끊기는 것 방지 */
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
     }
 
     .sector {
@@ -536,8 +548,10 @@
 </head>
 <body>
   <section class="panel schedule">
-    <div class="day-tabs" id="dayTabs"></div>
-    <button class="copy-day-btn" id="copyDayBtn">이 요일 복사</button>
+    <div class="schedule-top">
+      <div class="day-tabs" id="dayTabs"></div>
+      <button class="copy-day-btn" id="copyDayBtn">복사</button>
+    </div>
     <div class="clock-wrap">
       <svg class="clock" viewBox="0 0 100 100" id="clock"></svg>
     </div>
@@ -823,6 +837,11 @@
     let editStart = null, editEnd = null; // 편집 중인 시간 범위 (단일이면 start === end)
     let selectedColor = PALETTE[0];
 
+    // 시트가 열린 시각. 삼성 등 안드로이드 브라우저는 터치 후 ~300ms 뒤에 같은
+    // 좌표로 합성(ghost) click을 한 번 더 보내는데, 시계를 탭해 시트를 연 직후
+    // 그 ghost click이 backdrop에 떨어져 시트가 즉시 닫히는 것을 막는 가드.
+    let lastSheetOpen = 0;
+
     // 팔레트 스와치 생성
     PALETTE.forEach(color => {
       const sw = document.createElement('div');
@@ -852,6 +871,7 @@
       sheetInput.value = item.label;
       // 기존 색이 팔레트에 있으면 그 색, 없으면 첫 색 선택
       selectColor(PALETTE.includes(item.color) ? item.color : PALETTE[0]);
+      lastSheetOpen = Date.now();
       backdrop.classList.add('open');
       sheet.classList.add('open');
       // 사용자 탭과 같은 동기 컨텍스트에서 바로 포커스해야 iOS가 키보드를 띄운다
@@ -880,7 +900,11 @@
 
     document.getElementById('btnSave').addEventListener('click', saveSheet);
     document.getElementById('btnCancel').addEventListener('click', closeSheet);
-    backdrop.addEventListener('click', () => { closeSheet(); closeTodoSheet(); closeCopySheet(); });
+    backdrop.addEventListener('click', () => {
+      // 시계 탭으로 시트를 연 직후 날아오는 ghost click(삼성 등)은 무시 → 즉시 닫힘 방지
+      if (Date.now() - lastSheetOpen < 500) return;
+      closeSheet(); closeTodoSheet(); closeCopySheet();
+    });
     sheetInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') saveSheet();
     });
@@ -900,9 +924,17 @@
         deg = ((deg % 360) + 360) % 360;
         return Math.floor(deg / STEP) % 24;
       }
+      // 파이(부채꼴) 안쪽을 눌렀는지 판정. 바깥 배경 탭으로 시트가 열리는 것 방지.
+      function inClock(e) {
+        const rect = svg.getBoundingClientRect();
+        const sx = (e.clientX - rect.left) / rect.width * 100;
+        const sy = (e.clientY - rect.top) / rect.height * 100;
+        return Math.hypot(sx - CX, sy - CY) <= R_OUTER;
+      }
       function clearTimer() { if (timer) { clearTimeout(timer); timer = null; } }
 
       svg.addEventListener('pointerdown', e => {
+        if (!inClock(e)) return; // 파이 바깥(배경) 탭은 무시
         startHour = hourFromEvent(e);
         downXY = { x: e.clientX, y: e.clientY };
         active = false;
@@ -976,6 +1008,7 @@
         chip.addEventListener('click', () => chip.classList.toggle('selected'));
         copyChips.appendChild(chip);
       });
+      lastSheetOpen = Date.now();
       backdrop.classList.add('open');
       copySheet.classList.add('open');
     }
@@ -1057,6 +1090,7 @@
 
     function openTodoSheet() {
       todoInput.value = '';
+      lastSheetOpen = Date.now();
       backdrop.classList.add('open');
       todoSheet.classList.add('open');
       // 사용자 탭과 같은 동기 컨텍스트에서 바로 포커스해야 iOS가 키보드를 띄운다

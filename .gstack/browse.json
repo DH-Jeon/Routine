@@ -1,8 +1,8 @@
 {
-  "pid": 36987,
-  "port": 35679,
-  "token": "43c53a29-4aad-4261-9c4d-48eefa504cf9",
-  "startedAt": "2026-06-29T15:32:20.437Z",
+  "pid": 56032,
+  "port": 17305,
+  "token": "8440a247-ade8-489f-bb2e-31e833fe6000",
+  "startedAt": "2026-06-30T09:43:34.822Z",
   "serverPath": "/Users/jeondonghyeon/.claude/skills/gstack/browse/src/server.ts",
   "mode": "launched"
 }
