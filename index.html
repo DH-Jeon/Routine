@@ -160,6 +160,23 @@
       filter: brightness(0.95);
     }
 
+    /* 현재 요일 시간표를 초기화하는 버튼 (복사 버튼 오른쪽) */
+    .clear-day-btn {
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .clear-day-btn:active {
+      filter: brightness(0.95);
+    }
+
     /* 복사 대상 요일 선택 칩 */
     .day-chips {
       display: flex;
@@ -562,6 +579,11 @@
     <div class="schedule-top">
       <div class="day-tabs" id="dayTabs"></div>
       <button class="copy-day-btn" id="copyDayBtn">복사</button>
+      <button class="clear-day-btn" id="clearDayBtn" aria-label="요일 초기화">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h18M8 6V4h8v2m1 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m4 4v6m6-6v6"/>
+        </svg>
+      </button>
     </div>
     <div class="clock-wrap">
       <svg class="clock" viewBox="0 0 100 100" id="clock"></svg>
@@ -604,6 +626,15 @@
     <div class="sheet-actions">
       <button class="btn btn-cancel" id="btnCopyCancel">취소</button>
       <button class="btn btn-save" id="btnCopyApply">붙여넣기</button>
+    </div>
+  </div>
+
+  <!-- 요일 초기화 확인 하단 시트 -->
+  <div class="sheet" id="clearSheet">
+    <div class="sheet-title" id="clearTitle">시간표를 초기화할까요?</div>
+    <div class="sheet-actions">
+      <button class="btn btn-cancel" id="btnClearCancel">취소</button>
+      <button class="btn btn-save" id="btnClearConfirm">초기화</button>
     </div>
   </div>
 
@@ -942,7 +973,7 @@
     backdrop.addEventListener('click', () => {
       // 시계 탭으로 시트를 연 직후 날아오는 ghost click(삼성 등)은 무시 → 즉시 닫힘 방지
       if (Date.now() - lastSheetOpen < 500) return;
-      closeSheet(); closeTodoSheet(); closeCopySheet();
+      closeSheet(); closeTodoSheet(); closeCopySheet(); closeClearSheet();
     });
     sheetInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') saveSheet();
@@ -1086,6 +1117,32 @@
     document.getElementById('copyDayBtn').addEventListener('click', openCopySheet);
     document.getElementById('btnCopyCancel').addEventListener('click', closeCopySheet);
     document.getElementById('btnCopyApply').addEventListener('click', applyCopy);
+
+    /* ---------- 요일 초기화 ---------- */
+    const clearSheet = document.getElementById('clearSheet');
+    const clearTitle = document.getElementById('clearTitle');
+
+    function openClearSheet() {
+      clearTitle.textContent = DAYS[currentDay] + '요일 시간표를 초기화할까요?';
+      lastSheetOpen = Date.now();
+      backdrop.classList.add('open');
+      clearSheet.classList.add('open');
+    }
+    function closeClearSheet() {
+      backdrop.classList.remove('open');
+      clearSheet.classList.remove('open');
+    }
+    function applyClear() {
+      // 현재 요일을 빈 시간표로 교체
+      schedules[currentDay] = emptyDay();
+      schedule = schedules[currentDay];
+      saveSchedule();
+      render();
+      closeClearSheet();
+    }
+    document.getElementById('clearDayBtn').addEventListener('click', openClearSheet);
+    document.getElementById('btnClearCancel').addEventListener('click', closeClearSheet);
+    document.getElementById('btnClearConfirm').addEventListener('click', applyClear);
 
     /* ---------- 요일 탭 ---------- */
     const dayTabs = document.getElementById('dayTabs');
