@@ -208,6 +208,13 @@
       user-select: none;
       -webkit-touch-callout: none;
     }
+    /* SVG <text>는 부모(.clock)의 user-select를 상속하지 않는 브라우저가 있어
+       꾹 눌러 드래그할 때 시간 숫자가 선택된다. 텍스트에 직접 막는다. */
+    .clock text {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
 
     .sector {
       stroke: none;
@@ -713,6 +720,8 @@
 
     // 길게 눌러 드래그하는 동안의 선택 범위 (null이면 선택 중 아님)
     let selRange = null; // { start, end, dir }  dir: +1 시계방향, -1 반시계
+    let brush = null;          // 드래그로 칠할 활동 { label, color }
+    let scheduleBackup = null; // 드래그 시작 시점 스냅샷 (취소·재계산용)
     // 드래그로 선택된 시간들을 누른 방향(시계/반시계)대로 반환. 자정(23↔0)도 넘는다.
     function selectedHourList() {
       if (!selRange) return [];
@@ -728,6 +737,15 @@
     }
     function selectedHours() {
       return new Set(selectedHourList());
+    }
+    // 시작 칸의 활동(brush)을 현재 드래그 경로의 칸들에 칠한다.
+    // 매번 시작 시점 스냅샷에서 복원 후 다시 칠해, 드래그를 줄였다 늘렸다 해도 정확하다.
+    function paintSelection() {
+      if (!brush || !scheduleBackup) return;
+      for (let h = 0; h < 24; h++) schedule[h] = { ...scheduleBackup[h] };
+      for (const h of selectedHourList()) {
+        schedule[h] = { hour: h, label: brush.label, color: brush.color };
+      }
     }
 
     function render() {
@@ -961,12 +979,18 @@
         active = false;
         clearTimer();
         timer = setTimeout(() => {
-          // 길게 누름 성립 → 범위 선택 시작
-          active = true;
           timer = null;
+          // 빈 칸에서 시작하면 칠할 활동이 없으므로 무시
+          const src = schedule[startHour];
+          if (!src.label) return;
+          // 길게 누름 성립 → 시작 칸의 활동을 드래그 경로에 칠하기 시작
+          active = true;
+          brush = { label: src.label, color: src.color };
+          scheduleBackup = schedule.map(x => ({ ...x }));
           selRange = { start: startHour, end: startHour, dir: null };
           try { svg.setPointerCapture(e.pointerId); } catch (_) {}
           if (navigator.vibrate) navigator.vibrate(15);
+          paintSelection();
           render();
         }, LONG_MS);
       });
@@ -981,6 +1005,7 @@
             selRange.dir = cw <= ccw ? 1 : -1;
           }
           selRange.end = h;
+          paintSelection();
           render();
         } else if (downXY) {
           // 길게 누름 전 큰 움직임이면 제스처 취소(스크롤 등으로 간주)
@@ -994,11 +1019,10 @@
 
       svg.addEventListener('pointerup', e => {
         if (active) {
-          // 범위 선택 완료 → 범위 입력 시트 열기 (드래그 방향대로, 자정 wrap 포함)
-          const hours = selectedHourList();
-          selRange = null;
+          // 칠하기 완료 → 이미 반영된 결과를 저장 확정
+          selRange = null; brush = null; scheduleBackup = null;
+          saveSchedule();
           render();
-          openSheet(hours);
         } else if (timer && downXY) {
           // 짧은 탭 → 단일 칸 입력
           clearTimer();
@@ -1009,7 +1033,12 @@
 
       function cancelGesture() {
         clearTimer();
-        if (active && selRange) { selRange = null; render(); }
+        // 칠하던 중 취소 → 시작 시점 스냅샷으로 되돌린다
+        if (active && scheduleBackup) {
+          for (let h = 0; h < 24; h++) schedule[h] = { ...scheduleBackup[h] };
+          render();
+        }
+        selRange = null; brush = null; scheduleBackup = null;
         active = false; startHour = null; downXY = null;
       }
       svg.addEventListener('pointercancel', cancelGesture);
