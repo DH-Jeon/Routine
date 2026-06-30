@@ -1222,6 +1222,10 @@
         startY = e.clientY;
         width = item.offsetWidth;
         content.style.transition = 'none';
+        // 직전 복귀 애니메이션이 이 pointerdown으로 끊기면 transitionend가
+        // 안 떠서 빨간 배경(swiping)이 남는다. 새 제스처 시작 시 한 번 정리하고,
+        // 다시 가로 스와이프면 pointermove에서 도로 켠다.
+        item.classList.remove('swiping');
       });
 
       content.addEventListener('pointermove', e => {
