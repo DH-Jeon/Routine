@@ -835,14 +835,31 @@
         text.setAttribute('fill', textColorFor(run.color));
         text.textContent = run.label;
         svg.appendChild(text);
-        // 칸 너비(호 길이 근사)를 넘으면 …로 잘라 부채꼴 밖으로 삐져나가지 않게
+        // 가로로 충분히 들어가면 그대로 두고, 좁아서 잘릴 경우만 방사형 세로 쌓기로 전환
         const maxW = run.hours.length * (2 * Math.PI * R_TEXT / 24) * 0.92;
         if (text.getComputedTextLength() > maxW && run.label.length > 1) {
-          let s = run.label;
-          while (s.length > 1 && text.getComputedTextLength() > maxW) {
-            s = s.slice(0, -1);
-            text.textContent = s + '…';
-          }
+          // 가로 텍스트 제거 후 중심→바깥 방향으로 글자 하나씩 세로 쌓기
+          svg.removeChild(text);
+          const fill = textColorFor(run.color);
+          const STEP_R = 3.6;            // 글자 간격(폰트 3.4 + 여백)
+          const R_IN = 14, R_OUT = R_OUTER - 3; // 글자가 놓일 반지름 밴드
+          const maxChars = Math.floor((R_OUT - R_IN) / STEP_R) + 1;
+          let chars = Array.from(run.label);
+          if (chars.length > maxChars) chars = chars.slice(0, maxChars - 1).concat('…');
+          const n = chars.length;
+          // R_TEXT 기준 중앙 정렬하되 밴드 밖으로 나가지 않게 clamp
+          let startR = R_TEXT - (n - 1) * STEP_R / 2;
+          startR = Math.min(Math.max(startR, R_IN), R_OUT - (n - 1) * STEP_R);
+          chars.forEach((ch, i) => {
+            const rp = polar(midAngle, startR + i * STEP_R);
+            const ct = document.createElementNS(SVG_NS, 'text');
+            ct.setAttribute('class', 'sector-label');
+            ct.setAttribute('x', rp.x);
+            ct.setAttribute('y', rp.y);
+            ct.setAttribute('fill', fill);
+            ct.textContent = ch;
+            svg.appendChild(ct);
+          });
         }
       });
 
