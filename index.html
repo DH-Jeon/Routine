@@ -22,8 +22,7 @@
       font-weight: 45 920;
       font-style: normal;
       font-display: swap;
-      src: local('Pretendard Variable'),
-           url('fonts/PretendardVariable.woff2') format('woff2-variations');
+      src: url('fonts/PretendardVariable.woff2') format('woff2');
     }
 
     /* ============================================================
@@ -90,6 +89,7 @@
       color: var(--text);
       background: var(--bg);
       overflow: hidden;
+      touch-action: manipulation; /* 더블 탭 확대 방지 */
     }
 
     /* 위/아래 절반씩 나누는 패널 공통 */
