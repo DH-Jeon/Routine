@@ -439,7 +439,7 @@
       box-shadow: var(--shadow);
     }
 
-    /* 뒤에 깔리는 빨간 삭제 배경 */
+    /* 뒤에 깔리는 빨간 삭제 배경 — 스와이프 중에만 표시 (스크롤 시 가장자리 비침 방지) */
     .todo-delete-bg {
       position: absolute;
       inset: 0;
@@ -451,6 +451,10 @@
       align-items: center;
       justify-content: flex-end;
       padding-right: 22px;
+      visibility: hidden;
+    }
+    .todo-item.swiping .todo-delete-bg {
+      visibility: visible;
     }
 
     /* 스와이프로 움직이는 전경 */
@@ -1176,8 +1180,11 @@
         if (axis === null) {
           if (Math.abs(mx) < 6 && Math.abs(my) < 6) return; // 너무 작은 떨림은 무시
           axis = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
-          // 가로 스와이프로 확정된 경우에만 포인터를 캡처
-          if (axis === 'x') content.setPointerCapture(e.pointerId);
+          // 가로 스와이프로 확정된 경우에만 포인터를 캡처 + 빨간 배경 노출
+          if (axis === 'x') {
+            content.setPointerCapture(e.pointerId);
+            item.classList.add('swiping');
+          }
         }
         if (axis !== 'x') return; // 세로 스크롤이면 카드를 움직이지 않음 (빨간 배경 노출 방지)
         moved = true;
@@ -1192,8 +1199,15 @@
           content.style.transition = 'transform 0.25s ease';
           if (Math.abs(dx) > width * 0.4) {
             removeItem(item, content, id);
-          } else {
+          } else if (dx < 0) {
             content.style.transform = 'translateX(0)';
+            // 원위치 애니메이션이 끝나면 빨간 배경을 다시 숨김
+            content.addEventListener('transitionend', () => {
+              item.classList.remove('swiping');
+            }, { once: true });
+          } else {
+            // 실제 이동이 없었으면 즉시 숨김 (transition 미발생)
+            item.classList.remove('swiping');
           }
         }
         dx = 0;
@@ -1246,7 +1260,7 @@
     function addTodo(text) {
       const trimmed = text.trim();
       if (trimmed === '') return;
-      todos.push({ id: todoSeq++, text: trimmed, done: false, createdAt: Date.now() });
+      todos.unshift({ id: todoSeq++, text: trimmed, done: false, createdAt: Date.now() });
       saveTodos();
       renderTodos();
     }
