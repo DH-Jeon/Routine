@@ -712,15 +712,22 @@
     }
 
     // 길게 눌러 드래그하는 동안의 선택 범위 (null이면 선택 중 아님)
-    let selRange = null; // { start, end }
-    function selectedHours() {
-      const set = new Set();
-      if (selRange) {
-        const lo = Math.min(selRange.start, selRange.end);
-        const hi = Math.max(selRange.start, selRange.end);
-        for (let h = lo; h <= hi; h++) set.add(h);
+    let selRange = null; // { start, end, dir }  dir: +1 시계방향, -1 반시계
+    // 드래그로 선택된 시간들을 누른 방향(시계/반시계)대로 반환. 자정(23↔0)도 넘는다.
+    function selectedHourList() {
+      if (!selRange) return [];
+      const { start, end } = selRange;
+      const dir = selRange.dir || 1;
+      const list = [];
+      for (let k = 0; k < 24; k++) {
+        const h = (start + dir * k + 24) % 24;
+        list.push(h);
+        if (h === end) break;
       }
-      return set;
+      return list;
+    }
+    function selectedHours() {
+      return new Set(selectedHourList());
     }
 
     function render() {
@@ -779,6 +786,15 @@
         text.setAttribute('fill', textColorFor(run.color));
         text.textContent = run.label;
         svg.appendChild(text);
+        // 칸 너비(호 길이 근사)를 넘으면 …로 잘라 부채꼴 밖으로 삐져나가지 않게
+        const maxW = run.hours.length * (2 * Math.PI * R_TEXT / 24) * 0.92;
+        if (text.getComputedTextLength() > maxW && run.label.length > 1) {
+          let s = run.label;
+          while (s.length > 1 && text.getComputedTextLength() > maxW) {
+            s = s.slice(0, -1);
+            text.textContent = s + '…';
+          }
+        }
       });
 
       // 5) 바깥쪽 시간 숫자 (0~23) — 칸 가운데가 아니라 칸 경계선 위에 표시
@@ -838,7 +854,7 @@
     const sheetInput = document.getElementById('sheetInput');
     const paletteEl = document.getElementById('palette');
 
-    let editStart = null, editEnd = null; // 편집 중인 시간 범위 (단일이면 start === end)
+    let editHours = null; // 편집 중인 시간 배열 (단일이면 [h], 범위면 순서대로·자정 wrap 가능)
     let selectedColor = PALETTE[0];
 
     // 시트가 열린 시각. 삼성 등 안드로이드 브라우저는 터치 후 ~300ms 뒤에 같은
@@ -863,13 +879,14 @@
       });
     }
 
-    function openSheet(start, end) {
-      if (end === undefined) end = start;
-      editStart = start;
-      editEnd = end;
+    function openSheet(hours) {
+      // hours: 선택된 시간 배열. 단일이면 [h], 범위면 누른 순서대로(자정 wrap 포함)
+      if (!hours || !hours.length) return;
+      editHours = hours.slice();
+      const start = hours[0], end = hours[hours.length - 1];
       const item = schedule[start];
       const pad = h => String(h).padStart(2, '0');
-      sheetTitle.textContent = start === end
+      sheetTitle.textContent = hours.length === 1
         ? pad(start) + '시 활동'
         : pad(start) + '시–' + pad(end) + '시 활동';
       sheetInput.value = item.label;
@@ -885,18 +902,18 @@
     function closeSheet() {
       backdrop.classList.remove('open');
       sheet.classList.remove('open');
-      editStart = editEnd = null;
+      editHours = null;
     }
 
     function saveSheet() {
-      if (editStart === null) return;
+      if (!editHours || !editHours.length) return;
       const label = sheetInput.value.trim();
-      // 범위 내 모든 시간에 같은 활동 적용 (비우면 회색 빈 칸으로 초기화)
-      for (let h = editStart; h <= editEnd; h++) {
+      // 선택된 모든 시간에 같은 활동 적용 (비우면 회색 빈 칸으로 초기화)
+      editHours.forEach(h => {
         schedule[h] = label === ''
           ? { hour: h, label: '', color: '#eeeeee' }
           : { hour: h, label, color: selectedColor };
-      }
+      });
       saveSchedule();
       render();
       closeSheet();
@@ -947,7 +964,7 @@
           // 길게 누름 성립 → 범위 선택 시작
           active = true;
           timer = null;
-          selRange = { start: startHour, end: startHour };
+          selRange = { start: startHour, end: startHour, dir: null };
           try { svg.setPointerCapture(e.pointerId); } catch (_) {}
           if (navigator.vibrate) navigator.vibrate(15);
           render();
@@ -956,7 +973,14 @@
 
       svg.addEventListener('pointermove', e => {
         if (active) {
-          selRange.end = hourFromEvent(e);
+          const h = hourFromEvent(e);
+          // 첫 이동에서 시계/반시계 방향을 한 번 정한다 (자정 wrap 방향 결정)
+          if (selRange.dir === null && h !== selRange.start) {
+            const cw = (h - selRange.start + 24) % 24;   // 시계방향 거리
+            const ccw = (selRange.start - h + 24) % 24;  // 반시계 거리
+            selRange.dir = cw <= ccw ? 1 : -1;
+          }
+          selRange.end = h;
           render();
         } else if (downXY) {
           // 길게 누름 전 큰 움직임이면 제스처 취소(스크롤 등으로 간주)
@@ -970,16 +994,15 @@
 
       svg.addEventListener('pointerup', e => {
         if (active) {
-          // 범위 선택 완료 → 범위 입력 시트 열기
-          const lo = Math.min(selRange.start, selRange.end);
-          const hi = Math.max(selRange.start, selRange.end);
+          // 범위 선택 완료 → 범위 입력 시트 열기 (드래그 방향대로, 자정 wrap 포함)
+          const hours = selectedHourList();
           selRange = null;
           render();
-          openSheet(lo, hi);
+          openSheet(hours);
         } else if (timer && downXY) {
           // 짧은 탭 → 단일 칸 입력
           clearTimer();
-          openSheet(hourFromEvent(e));
+          openSheet([hourFromEvent(e)]);
         }
         active = false; startHour = null; downXY = null;
       });
