@@ -850,7 +850,16 @@
           // R_TEXT 기준 중앙 정렬하되 밴드 밖으로 나가지 않게 clamp
           let startR = R_TEXT - (n - 1) * STEP_R / 2;
           startR = Math.min(Math.max(startR, R_IN), R_OUT - (n - 1) * STEP_R);
-          chars.forEach((ch, i) => {
+          // 방사형으로 쌓으면 시계 위쪽/왼쪽 칸은 바깥 끝이 위(또는 왼쪽)라
+          // 글자가 아래→위로 놓여 거꾸로 읽힌다. 바깥 끝이 읽기 시작점(더 위,
+          // 수평이면 더 왼쪽)이면 순서를 뒤집어, 항상 위→아래(수평이면 왼→오)로
+          // 읽히게 한다. 하단/오른쪽 칸은 그대로 둔다.
+          const innerP = polar(midAngle, startR);
+          const outerP = polar(midAngle, startR + (n - 1) * STEP_R);
+          const outerIsStart = (outerP.y < innerP.y - 0.01) ||
+            (Math.abs(outerP.y - innerP.y) <= 0.01 && outerP.x < innerP.x);
+          const seq = outerIsStart ? chars.slice().reverse() : chars;
+          seq.forEach((ch, i) => {
             const rp = polar(midAngle, startR + i * STEP_R);
             const ct = document.createElementNS(SVG_NS, 'text');
             ct.setAttribute('class', 'sector-label');
