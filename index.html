@@ -43,6 +43,7 @@
       --sector-empty: #ededf2;  /* 빈 시간 칸 색 */
       --accent: #ff6a00;        /* 강조색(버튼·포커스) */
       --danger: #ff3b30;        /* 삭제 배경 */
+      --weekend: #007aff;       /* 달력 토요일 */
       --done: #34c759;          /* 완료 체크 */
       --done-text: #b0b0b5;     /* 완료된 할 일 글자 */
       --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);   /* 카드 그림자 */
@@ -63,6 +64,7 @@
         --sector-empty: #2c2c2e;
         --accent: #ff7a1a;
         --danger: #ff453a;
+        --weekend: #0a84ff;
         --done: #30d158;
         --done-text: #6e6e73;
         --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
@@ -349,6 +351,141 @@
       border-color: var(--accent);
     }
 
+    /* 할 일 시트의 날짜 선택 (− 8월 14일 (금) +) */
+    .date-stepper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .date-step-btn {
+      flex: none;
+      width: 44px;
+      height: 44px;
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .date-step-btn:active {
+      filter: brightness(0.95);
+    }
+    .date-step-label {
+      flex: 1;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    /* ---------- 달력 시트 ---------- */
+    .cal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .cal-nav {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .cal-arrow {
+      flex: none;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .cal-arrow:active {
+      background: var(--surface-2);
+    }
+    .cal-title {
+      font-size: 17px;
+      font-weight: 700;
+      min-width: 92px;
+      text-align: center;
+    }
+    /* 표시 모드 이름 (완료 개수 ↔ 완료 비율) */
+    .cal-mode-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      min-width: 58px;
+      text-align: center;
+    }
+
+    .cal-weekdays,
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+    }
+    .cal-weekday {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding: 4px 0 6px;
+    }
+    .cal-weekday.sun { color: var(--danger); }
+    .cal-weekday.sat { color: var(--weekend); }
+
+    .cal-grid {
+      margin-bottom: 18px;
+    }
+    .cal-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      padding: 3px 0;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    /* 앞뒤 달 날짜는 흐리게 */
+    .cal-cell.out {
+      opacity: 0.32;
+    }
+    /* 날짜 숫자 — 완료 개수 모드에서 이 원에 빨간 반투명 배경이 깔린다 */
+    .cal-num {
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .cal-cell.sun .cal-num { color: var(--danger); }
+    .cal-cell.sat .cal-num { color: var(--weekend); }
+    .cal-cell.today .cal-num {
+      box-shadow: inset 0 0 0 2px var(--accent);
+      font-weight: 800;
+    }
+    /* 완료 비율(2/3) 자리 — 두 모드에서 칸 높이가 흔들리지 않게 항상 확보 */
+    .cal-sub {
+      height: 12px;
+      line-height: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
     .palette {
       display: flex;
       flex-wrap: wrap;
@@ -412,8 +549,14 @@
       z-index: 2;
     }
 
+    /* 할 일 추가 버튼 + 달력 버튼 한 줄 */
+    .tasks-actions {
+      display: flex;
+      gap: 8px;
+    }
+
     .add-btn {
-      width: 100%;
+      flex: 1;
       min-height: 52px;
       font-size: 16px;
       font-weight: 700;
@@ -426,6 +569,25 @@
       box-shadow: var(--shadow-btn);
     }
     .add-btn:active {
+      filter: brightness(0.95);
+    }
+
+    /* 달력 열기 버튼 (할 일 추가 오른쪽) */
+    .cal-btn {
+      flex: none;
+      width: 52px;
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      box-shadow: var(--shadow);
+    }
+    .cal-btn:active {
       filter: brightness(0.95);
     }
 
@@ -523,12 +685,33 @@
       cursor: pointer; /* 눌러서 수정 */
     }
 
-    /* 추가된 날짜 (월/일) — 행 오른쪽에 작게 */
-    .todo-date {
-      flex: none;
-      font-size: 13px;
+    /* 날짜 소제목 — 같은 날짜의 할 일들을 묶는다 */
+    .todo-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 4px 8px;
+      font-size: 14px;
+      font-weight: 700;
       color: var(--text-muted);
-      white-space: nowrap;
+      /* 스티키 헤더(추가·달력 버튼 줄)에 가리지 않게 스크롤 시 여백 확보 */
+      scroll-margin-top: 80px;
+      transition: color 0.2s ease;
+    }
+    .todo-group:first-child {
+      padding-top: 4px;
+    }
+    .todo-group .today-badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--accent);
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+    /* 달력에서 날짜를 눌러 이동했을 때 잠깐 강조 */
+    .todo-group.flash {
+      color: var(--accent);
     }
 
     /* 완료 상태: 초록 체크 + 취소선 + 흐리게 */
@@ -593,7 +776,14 @@
 
   <section class="panel tasks">
     <div class="tasks-header">
-      <button class="add-btn" id="addBtn">+ 할 일 추가</button>
+      <div class="tasks-actions">
+        <button class="add-btn" id="addBtn">+ 할 일 추가</button>
+        <button class="cal-btn" id="calBtn" aria-label="달력 보기">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>
+          </svg>
+        </button>
+      </div>
     </div>
     <div class="todo-list" id="todoList"></div>
   </section>
@@ -613,10 +803,44 @@
   <!-- 할 일 추가 하단 시트 -->
   <div class="sheet" id="todoSheet">
     <div class="sheet-title" id="todoSheetTitle">할 일 추가</div>
+    <div class="date-stepper">
+      <button class="date-step-btn" id="todoDatePrev" aria-label="하루 전">−</button>
+      <div class="date-step-label" id="todoDateLabel">날짜</div>
+      <button class="date-step-btn" id="todoDateNext" aria-label="하루 후">+</button>
+    </div>
     <input class="sheet-input" id="todoInput" type="text" placeholder="할 일을 입력하세요" maxlength="60" />
     <div class="sheet-actions">
       <button class="btn btn-cancel" id="btnTodoCancel">취소</button>
       <button class="btn btn-save" id="btnTodoAdd">추가</button>
+    </div>
+  </div>
+
+  <!-- 할 일 달력 하단 시트 -->
+  <div class="sheet" id="calSheet">
+    <div class="cal-head">
+      <div class="cal-nav">
+        <button class="cal-arrow" id="calPrevMonth" aria-label="이전 달">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="cal-title" id="calTitle">달력</div>
+        <button class="cal-arrow" id="calNextMonth" aria-label="다음 달">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="cal-nav">
+        <button class="cal-arrow" id="calPrevMode" aria-label="이전 표시 방식">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="cal-mode-name" id="calModeName">완료 개수</div>
+        <button class="cal-arrow" id="calNextMode" aria-label="다음 표시 방식">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="cal-weekdays" id="calWeekdays"></div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="sheet-actions">
+      <button class="btn btn-cancel" id="btnCalClose">닫기</button>
     </div>
   </div>
 
@@ -1000,7 +1224,7 @@
     backdrop.addEventListener('click', () => {
       // 시계 탭으로 시트를 연 직후 날아오는 ghost click(삼성 등)은 무시 → 즉시 닫힘 방지
       if (Date.now() - lastSheetOpen < 500) return;
-      closeSheet(); closeTodoSheet(); closeCopySheet(); closeClearSheet();
+      closeSheet(); closeTodoSheet(); closeCalSheet(); closeCopySheet(); closeClearSheet();
     });
     sheetInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') saveSheet();
@@ -1195,8 +1419,37 @@
     // 1분마다 현재 시각 마커 위치 갱신 (오늘 탭을 볼 때만)
     setInterval(() => { if (currentDay === TODAY) render(); }, 60000);
 
+    /* ---------- 날짜 유틸 (할 일은 'YYYY-MM-DD' 로컬 날짜로 묶는다) ---------- */
+    const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+    const pad2 = n => String(n).padStart(2, '0');
+
+    function dateKeyOf(d) {
+      return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    }
+    function todayKey() {
+      return dateKeyOf(new Date());
+    }
+    function parseKey(key) {
+      const [y, m, d] = key.split('-').map(Number);
+      return new Date(y, m - 1, d); // 로컬 기준 (UTC 파싱으로 하루 밀리는 것 방지)
+    }
+    function isDateKey(v) {
+      return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    }
+    // 날짜를 delta일 만큼 이동 (월·연 경계는 Date가 알아서 넘긴다)
+    function shiftKey(key, delta) {
+      const d = parseKey(key);
+      d.setDate(d.getDate() + delta);
+      return dateKeyOf(d);
+    }
+    // "8월 14일 (금)"
+    function formatDateFull(key) {
+      const d = parseKey(key);
+      return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + WEEKDAY_KO[d.getDay()] + ')';
+    }
+
     /* ---------- 할 일 목록 ---------- */
-    const todos = []; // [{id, text, done}]
+    const todos = []; // [{id, text, done, createdAt, date}]  date: 'YYYY-MM-DD'
     let todoSeq = 1;
 
     function saveTodos() {
@@ -1208,15 +1461,21 @@
         if (!raw) return;
         const data = JSON.parse(raw);
         if (!Array.isArray(data)) return;
+        let fixed = false;
         data.forEach(t => {
           if (t && typeof t.text === 'string') {
-            todos.push({ id: t.id, text: t.text, done: !!t.done, createdAt: t.createdAt });
+            // 날짜가 없는(구버전) 항목은 추가한 날로 배정, 그것도 없으면 오늘
+            let date = t.date;
+            if (!isDateKey(date)) {
+              date = t.createdAt ? dateKeyOf(new Date(t.createdAt)) : todayKey();
+              fixed = true;
+            }
+            todos.push({ id: t.id, text: t.text, done: !!t.done, createdAt: t.createdAt, date });
           }
         });
         // 다음 id가 기존과 겹치지 않게
         todoSeq = todos.reduce((max, t) => Math.max(max, t.id || 0), 0) + 1;
         // id가 없는(구버전·손상) 항목에 새 id 부여 → 토글·삭제 가능하게
-        let fixed = false;
         todos.forEach(t => { if (t.id == null) { t.id = todoSeq++; fixed = true; } });
         if (fixed) saveTodos();
       } catch (e) {}
@@ -1230,13 +1489,22 @@
 
     const todoSheetTitle = document.getElementById('todoSheetTitle');
     const btnTodoAdd = document.getElementById('btnTodoAdd');
+    const todoDateLabel = document.getElementById('todoDateLabel');
     let editingTodoId = null; // null이면 추가 모드, 값이 있으면 그 항목 수정 모드
+    let sheetDate = todayKey(); // 시트에서 지정 중인 날짜
+
+    function setSheetDate(key) {
+      sheetDate = key;
+      todoDateLabel.textContent = formatDateFull(key);
+    }
 
     function openTodoSheet(todo) {
       editingTodoId = todo ? todo.id : null;
       todoSheetTitle.textContent = todo ? '할 일 수정' : '할 일 추가';
       btnTodoAdd.textContent = todo ? '저장' : '추가';
       todoInput.value = todo ? todo.text : '';
+      // 추가는 항상 오늘부터, 수정은 그 할 일의 날짜부터 시작
+      setSheetDate(todo ? todo.date : todayKey());
       lastSheetOpen = Date.now();
       backdrop.classList.add('open');
       todoSheet.classList.add('open');
@@ -1248,11 +1516,38 @@
       todoSheet.classList.remove('open');
     }
 
-    // 추가된 날짜를 월/일 형식으로 (예전 항목은 날짜가 없어 빈칸)
-    function formatDate(ts) {
-      if (!ts) return '';
-      const d = new Date(ts);
-      return (d.getMonth() + 1) + '/' + d.getDate();
+    document.getElementById('todoDatePrev').addEventListener('click', () => setSheetDate(shiftKey(sheetDate, -1)));
+    document.getElementById('todoDateNext').addEventListener('click', () => setSheetDate(shiftKey(sheetDate, 1)));
+
+    // 한 할 일의 카드 DOM 만들기 (스와이프 삭제까지 연결)
+    function createTodoItem(todo) {
+      const item = document.createElement('div');
+      item.className = 'todo-item' + (todo.done ? ' done' : '');
+
+      const bg = document.createElement('div');
+      bg.className = 'todo-delete-bg';
+      bg.textContent = '삭제';
+
+      const content = document.createElement('div');
+      content.className = 'todo-content';
+
+      const check = document.createElement('div');
+      check.className = 'todo-check';
+      check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      check.addEventListener('click', () => toggleTodo(todo.id));
+
+      const text = document.createElement('span');
+      text.className = 'todo-text';
+      text.textContent = todo.text;
+      text.addEventListener('click', () => openTodoSheet(todo));
+
+      content.appendChild(check);
+      content.appendChild(text);
+      item.appendChild(bg);
+      item.appendChild(content);
+
+      enableSwipe(item, content, todo.id);
+      return item;
     }
 
     function renderTodos() {
@@ -1266,39 +1561,26 @@
         return;
       }
 
-      todos.forEach(todo => {
-        const item = document.createElement('div');
-        item.className = 'todo-item' + (todo.done ? ' done' : '');
+      // 날짜별로 묶어서 표시 (최신 날짜가 위, 그룹 안에서는 추가한 순서 그대로)
+      const today = todayKey();
+      const keys = [...new Set(todos.map(t => t.date))].sort().reverse();
 
-        const bg = document.createElement('div');
-        bg.className = 'todo-delete-bg';
-        bg.textContent = '삭제';
+      keys.forEach(key => {
+        const head = document.createElement('div');
+        head.className = 'todo-group';
+        head.dataset.date = key;
+        head.textContent = formatDateFull(key);
+        if (key === today) {
+          const badge = document.createElement('span');
+          badge.className = 'today-badge';
+          badge.textContent = '오늘';
+          head.appendChild(badge);
+        }
+        todoList.appendChild(head);
 
-        const content = document.createElement('div');
-        content.className = 'todo-content';
-
-        const check = document.createElement('div');
-        check.className = 'todo-check';
-        check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-        check.addEventListener('click', () => toggleTodo(todo.id));
-
-        const text = document.createElement('span');
-        text.className = 'todo-text';
-        text.textContent = todo.text;
-        text.addEventListener('click', () => openTodoSheet(todo));
-
-        const date = document.createElement('span');
-        date.className = 'todo-date';
-        date.textContent = formatDate(todo.createdAt);
-
-        content.appendChild(check);
-        content.appendChild(text);
-        content.appendChild(date);
-        item.appendChild(bg);
-        item.appendChild(content);
-        todoList.appendChild(item);
-
-        enableSwipe(item, content, todo.id);
+        todos.forEach(todo => {
+          if (todo.date === key) todoList.appendChild(createTodoItem(todo));
+        });
       });
     }
 
@@ -1379,6 +1661,7 @@
       //    다시 그려져도 삭제한 항목이 되살아나지 않게 한다.
       const i = todos.findIndex(t => t.id === id);
       if (i === -1) return;
+      const date = todos[i].date;
       todos.splice(i, 1);
       saveTodos();
 
@@ -1397,7 +1680,9 @@
         if (finished) return;
         finished = true;
         item.remove();
-        if (todos.length === 0) renderTodos(); // 마지막 항목이면 안내문 표시
+        // 그 날짜의 마지막 항목이었다면 빈 날짜 소제목이 남으므로 다시 그린다
+        // (전체가 비었으면 안내문 표시)
+        if (!todos.some(t => t.date === date)) renderTodos();
       };
       item.addEventListener('transitionend', e => {
         if (e.propertyName === 'height') done();
@@ -1405,20 +1690,22 @@
       setTimeout(done, 350); // transitionend가 누락돼도 반드시 제거
     }
 
-    function addTodo(text) {
+    function addTodo(text, date) {
       const trimmed = text.trim();
       if (trimmed === '') return;
-      todos.unshift({ id: todoSeq++, text: trimmed, done: false, createdAt: Date.now() });
+      todos.unshift({ id: todoSeq++, text: trimmed, done: false, createdAt: Date.now(), date });
       saveTodos();
       renderTodos();
     }
 
-    function editTodo(id, text) {
+    function editTodo(id, text, date) {
       const trimmed = text.trim();
       if (trimmed === '') return; // 빈 값이면 수정하지 않음
       const todo = todos.find(t => t.id === id);
-      if (!todo || todo.text === trimmed) return;
+      if (!todo) return;
+      if (todo.text === trimmed && todo.date === date) return;
       todo.text = trimmed;
+      todo.date = date;
       saveTodos();
       renderTodos();
     }
@@ -1437,9 +1724,9 @@
 
     function submitTodo() {
       if (editingTodoId !== null) {
-        editTodo(editingTodoId, todoInput.value);
+        editTodo(editingTodoId, todoInput.value, sheetDate);
       } else {
-        addTodo(todoInput.value);
+        addTodo(todoInput.value, sheetDate);
       }
       closeTodoSheet();
     }
@@ -1449,6 +1736,129 @@
     todoInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') submitTodo();
     });
+
+    /* ---------- 할 일 달력 ---------- */
+    const calSheet = document.getElementById('calSheet');
+    const calTitle = document.getElementById('calTitle');
+    const calGrid = document.getElementById('calGrid');
+    const calWeekdays = document.getElementById('calWeekdays');
+    const calModeName = document.getElementById('calModeName');
+
+    // 오른쪽 위 화살표로 전환하는 표시 방식
+    const CAL_MODES = ['완료 개수', '완료 비율'];
+    let calModeIdx = 0;
+    let calY = 0, calM = 0; // 보고 있는 달 (calM은 0~11)
+
+    // 요일 머리글 (일~토)
+    WEEKDAY_KO.forEach((w, i) => {
+      const el = document.createElement('div');
+      el.className = 'cal-weekday' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '');
+      el.textContent = w;
+      calWeekdays.appendChild(el);
+    });
+
+    // 그 날짜의 완료/전체 개수
+    function statsFor(key) {
+      let total = 0, done = 0;
+      todos.forEach(t => {
+        if (t.date !== key) return;
+        total++;
+        if (t.done) done++;
+      });
+      return { total, done };
+    }
+
+    function renderCal() {
+      calTitle.textContent = calY + '년 ' + (calM + 1) + '월';
+      calModeName.textContent = CAL_MODES[calModeIdx];
+      calGrid.innerHTML = '';
+
+      const today = todayKey();
+      const first = new Date(calY, calM, 1);
+      const offset = first.getDay(); // 일요일 시작
+
+      // 6주(42칸) 고정 — 달마다 달력 높이가 바뀌지 않게
+      for (let i = 0; i < 42; i++) {
+        const d = new Date(calY, calM, 1 - offset + i);
+        const key = dateKeyOf(d);
+        const wd = d.getDay();
+        const { total, done } = statsFor(key);
+
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'cal-cell' +
+          (d.getMonth() === calM ? '' : ' out') +
+          (wd === 0 ? ' sun' : wd === 6 ? ' sat' : '') +
+          (key === today ? ' today' : '');
+        cell.dataset.date = key;
+
+        const num = document.createElement('div');
+        num.className = 'cal-num';
+        num.textContent = d.getDate();
+
+        const sub = document.createElement('div');
+        sub.className = 'cal-sub';
+
+        if (calModeIdx === 0) {
+          // 완료 개수 — 한 일이 많을수록 빨간 원이 진해진다
+          if (done > 0) {
+            const alpha = Math.min(0.12 + done * 0.14, 0.8);
+            num.style.background = 'rgba(255, 59, 48, ' + alpha.toFixed(2) + ')';
+            if (alpha >= 0.5) num.style.color = '#fff'; // 진한 배경 위에서는 흰 글자
+          }
+        } else if (total > 0) {
+          // 완료 비율 — 2/3 형식
+          sub.textContent = done + '/' + total;
+        }
+
+        cell.appendChild(num);
+        cell.appendChild(sub);
+        cell.addEventListener('click', () => focusDate(key));
+        calGrid.appendChild(cell);
+      }
+    }
+
+    // 달력에서 고른 날짜의 그룹으로 이동 (할 일이 없는 날은 닫기만)
+    function focusDate(key) {
+      closeCalSheet();
+      const head = todoList.querySelector('.todo-group[data-date="' + key + '"]');
+      if (!head) return;
+      head.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      head.classList.add('flash');
+      setTimeout(() => head.classList.remove('flash'), 1500);
+    }
+
+    function openCalSheet() {
+      const now = new Date();
+      calY = now.getFullYear();
+      calM = now.getMonth();
+      renderCal();
+      lastSheetOpen = Date.now();
+      backdrop.classList.add('open');
+      calSheet.classList.add('open');
+    }
+    function closeCalSheet() {
+      backdrop.classList.remove('open');
+      calSheet.classList.remove('open');
+    }
+
+    function shiftMonth(delta) {
+      const d = new Date(calY, calM + delta, 1);
+      calY = d.getFullYear();
+      calM = d.getMonth();
+      renderCal();
+    }
+    function shiftMode(delta) {
+      calModeIdx = (calModeIdx + delta + CAL_MODES.length) % CAL_MODES.length;
+      renderCal();
+    }
+
+    document.getElementById('calBtn').addEventListener('click', openCalSheet);
+    document.getElementById('calPrevMonth').addEventListener('click', () => shiftMonth(-1));
+    document.getElementById('calNextMonth').addEventListener('click', () => shiftMonth(1));
+    document.getElementById('calPrevMode').addEventListener('click', () => shiftMode(-1));
+    document.getElementById('calNextMode').addEventListener('click', () => shiftMode(1));
+    document.getElementById('btnCalClose').addEventListener('click', closeCalSheet);
 
     renderTodos();
   </script>
