@@ -520,6 +520,7 @@
       font-size: 16px;
       line-height: 1.35;
       word-break: break-word;
+      cursor: pointer; /* 눌러서 수정 */
     }
 
     /* 추가된 날짜 (월/일) — 행 오른쪽에 작게 */
@@ -611,7 +612,7 @@
 
   <!-- 할 일 추가 하단 시트 -->
   <div class="sheet" id="todoSheet">
-    <div class="sheet-title">할 일 추가</div>
+    <div class="sheet-title" id="todoSheetTitle">할 일 추가</div>
     <input class="sheet-input" id="todoInput" type="text" placeholder="할 일을 입력하세요" maxlength="60" />
     <div class="sheet-actions">
       <button class="btn btn-cancel" id="btnTodoCancel">취소</button>
@@ -1227,8 +1228,15 @@
     const todoInput = document.getElementById('todoInput');
     const todoList = document.getElementById('todoList');
 
-    function openTodoSheet() {
-      todoInput.value = '';
+    const todoSheetTitle = document.getElementById('todoSheetTitle');
+    const btnTodoAdd = document.getElementById('btnTodoAdd');
+    let editingTodoId = null; // null이면 추가 모드, 값이 있으면 그 항목 수정 모드
+
+    function openTodoSheet(todo) {
+      editingTodoId = todo ? todo.id : null;
+      todoSheetTitle.textContent = todo ? '할 일 수정' : '할 일 추가';
+      btnTodoAdd.textContent = todo ? '저장' : '추가';
+      todoInput.value = todo ? todo.text : '';
       lastSheetOpen = Date.now();
       backdrop.classList.add('open');
       todoSheet.classList.add('open');
@@ -1277,6 +1285,7 @@
         const text = document.createElement('span');
         text.className = 'todo-text';
         text.textContent = todo.text;
+        text.addEventListener('click', () => openTodoSheet(todo));
 
         const date = document.createElement('span');
         date.className = 'todo-date';
@@ -1404,6 +1413,16 @@
       renderTodos();
     }
 
+    function editTodo(id, text) {
+      const trimmed = text.trim();
+      if (trimmed === '') return; // 빈 값이면 수정하지 않음
+      const todo = todos.find(t => t.id === id);
+      if (!todo || todo.text === trimmed) return;
+      todo.text = trimmed;
+      saveTodos();
+      renderTodos();
+    }
+
     function toggleTodo(id) {
       const todo = todos.find(t => t.id === id);
       if (todo) {
@@ -1414,14 +1433,18 @@
     }
 
     // "+ 할 일 추가" → 팝업 시트 열기
-    addBtn.addEventListener('click', openTodoSheet);
+    addBtn.addEventListener('click', () => openTodoSheet());
 
     function submitTodo() {
-      addTodo(todoInput.value);
+      if (editingTodoId !== null) {
+        editTodo(editingTodoId, todoInput.value);
+      } else {
+        addTodo(todoInput.value);
+      }
       closeTodoSheet();
     }
 
-    document.getElementById('btnTodoAdd').addEventListener('click', submitTodo);
+    btnTodoAdd.addEventListener('click', submitTodo);
     document.getElementById('btnTodoCancel').addEventListener('click', closeTodoSheet);
     todoInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') submitTodo();
