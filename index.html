@@ -1561,7 +1561,7 @@
         return;
       }
 
-      // 날짜별로 묶어서 표시 (최신 날짜가 위, 그룹 안에서는 추가한 순서 그대로)
+      // 날짜별로 묶어서 표시 (최신 날짜가 위, 그룹 안에서는 미완료가 위 · 각각 추가한 순서 그대로)
       const today = todayKey();
       const keys = [...new Set(todos.map(t => t.date))].sort().reverse();
 
@@ -1578,9 +1578,9 @@
         }
         todoList.appendChild(head);
 
-        todos.forEach(todo => {
-          if (todo.date === key) todoList.appendChild(createTodoItem(todo));
-        });
+        const group = todos.filter(t => t.date === key);
+        group.filter(t => !t.done).forEach(t => todoList.appendChild(createTodoItem(t)));
+        group.filter(t => t.done).forEach(t => todoList.appendChild(createTodoItem(t)));
       });
     }
 
