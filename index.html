@@ -1305,8 +1305,10 @@
           selRange = null; brush = null; scheduleBackup = null;
           saveSchedule();
           render();
-        } else if (timer && downXY) {
+        } else if (downXY) {
           // 짧은 탭 → 단일 칸 입력
+          // (빈 칸을 길게 눌러 타이머가 이미 끝난 경우도 여기로 온다 — 칠할
+          //  활동이 없어 드래그가 시작되지 않으므로 그냥 입력 시트를 연다)
           clearTimer();
           openSheet([hourFromEvent(e)]);
         }
@@ -1516,8 +1518,17 @@
       todoSheet.classList.remove('open');
     }
 
-    document.getElementById('todoDatePrev').addEventListener('click', () => setSheetDate(shiftKey(sheetDate, -1)));
-    document.getElementById('todoDateNext').addEventListener('click', () => setSheetDate(shiftKey(sheetDate, 1)));
+    // 날짜 조정 버튼: 탭해도 입력창 포커스(키보드)를 잃지 않게 한다
+    [['todoDatePrev', -1], ['todoDateNext', 1]].forEach(([id, delta]) => {
+      const btn = document.getElementById(id);
+      // mousedown 기본동작(포커스 이동)을 막으면 키보드가 내려가지 않는다
+      btn.addEventListener('mousedown', e => e.preventDefault());
+      btn.addEventListener('click', () => {
+        setSheetDate(shiftKey(sheetDate, delta));
+        // 그래도 포커스가 빠졌으면 같은 탭 제스처 안에서 되돌린다
+        if (document.activeElement !== todoInput) todoInput.focus();
+      });
+    });
 
     // 한 할 일의 카드 DOM 만들기 (스와이프 삭제까지 연결)
     function createTodoItem(todo) {
